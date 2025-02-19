@@ -98,7 +98,7 @@ class TeamStats(TypedDict):
     losses: int
     wins_by_run_rule: int
     losses_by_run_rule: int
-    num_seasons: int
+    seasons: List[int]
 
 
 class GameResults(TypedDict):

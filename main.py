@@ -302,8 +302,8 @@ def calc_stats_from_all_games(
         "losses_by_run_rule": raw_stats["losses_by_run_rule"],
     }
 
-    if "seasons_played" in raw_stats:
-        stats["num_seasons"] = len(raw_stats["seasons_played"])
+    if "seasons" in raw_stats:
+        stats["seasons"] = sorted(list(raw_stats["seasons"]))
 
     return stats
 
@@ -728,7 +728,7 @@ def collect_career_performances_and_head_to_head(
         "oppso": 0,
         "games_played": 0,
         # not in TeamStats. only used temporarily
-        "seasons_played": set(),
+        "seasons": set(),
     }
 
     xbl_league_runs = 0
