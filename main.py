@@ -590,7 +590,10 @@ def collect_players(
             }
         )
 
-    # TODO we could sort each player's teams by season
+    # sort teams in order of ascending season
+    for player in players.keys():
+        sorted_teams = sorted(players[player]["teams"], key=lambda team: team["season"])
+        players[player]["teams"] = sorted_teams
 
     return players
 
@@ -1024,7 +1027,8 @@ def collect_career_performances_and_head_to_head(
 def build_career_stats(g_sheets_dir: Path, season: int):
     print(f"Running career stats...")
     data: CareerStats = {
-        "players": {},
+        "all_players": {},
+        "active_players": {},
         "season_performances": {},
         "season_head_to_head": [],
         "playoffs_performances": {},
@@ -1053,8 +1057,11 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         aa_abbrev_data = raw_data["values"]
 
     print("Finding who played which season...")
-    players = collect_players(xbl_abbrev_data, aaa_abbrev_data, aa_abbrev_data)
-    data["players"] = players
+    all_players = collect_players(xbl_abbrev_data, aaa_abbrev_data, aa_abbrev_data)
+    data["all_players"] = all_players
+
+    active_players = get_active_players(all_players, season)
+    data["active_players"] = active_players
 
     xbl_head_to_head_data = None
     with open(g_sheets_dir.joinpath("CAREER_STATS__XBL%20Head%20to%20Head.json")) as f:
