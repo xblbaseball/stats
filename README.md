@@ -10,17 +10,17 @@ Hit the following URLs with your favorite HTTP client and JSON reader to get sta
 
 Stats for each player by league and all-time. Also includes head-to-head stats.
 
-- JSON Data: [](https://xblbaseball.github.io/stats/careers.json)
-- JSON Schema: [](https://xblbaseball.github.io/stats/schemas/career-schema.json)
+- JSON Data: [https://xblbaseball.github.io/stats/careers.json](https://xblbaseball.github.io/stats/careers.json)
+- JSON Schema: [https://xblbaseball.github.io/stats/schemas/career-schema.json](https://xblbaseball.github.io/stats/schemas/career-schema.json)
 
 **Season Data**
 
 Stats from the current season by league.
 
-- XBL Data: [](https://xblbaseball.github.io/stats/XBL.json)
-- AAA Data: [](https://xblbaseball.github.io/stats/AAA.json)
-- AA Data: [](https://xblbaseball.github.io/stats/AA.json)
-- JSON Schema: [](https://xblbaseball.github.io/stats/schemas/season-schema.json)
+- XBL Data: [https://xblbaseball.github.io/stats/XBL.json](https://xblbaseball.github.io/stats/XBL.json)
+- AAA Data: [https://xblbaseball.github.io/stats/AAA.json](https://xblbaseball.github.io/stats/AAA.json)
+- AA Data: [https://xblbaseball.github.io/stats/AA.json](https://xblbaseball.github.io/stats/AA.json)
+- JSON Schema: [https://xblbaseball.github.io/stats/schemas/season-schema.json](https://xblbaseball.github.io/stats/schemas/season-schema.json)
 
 ## Development
 
