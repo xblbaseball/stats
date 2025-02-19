@@ -49,6 +49,7 @@ def collect_league_stats(json_dir: Path, g_sheets_api_key: str):
 
     for league in LEAGUES:
         for tab in tabs:
+            print(f"requesting {league} {tab}...", end="")
             url = f"https://sheets.googleapis.com/v4/spreadsheets/{LEAGUES[league]}/values/{tab}?key={g_sheets_api_key}"
 
             with urllib.request.urlopen(url) as req, open(
@@ -56,7 +57,7 @@ def collect_league_stats(json_dir: Path, g_sheets_api_key: str):
             ) as f:
                 f.write(req.read())
 
-            print(f"saved {league} {tab}")
+            print(f" saved {league} {tab}")
 
 
 def collect_all_time_stats(json_dir: Path, g_sheets_api_key: str):
