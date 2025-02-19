@@ -24,24 +24,34 @@ Stats from the current season by league.
 
 ## Development
 
-* Python 3.10
+**Python 3.10** is required.
 
-Test with
-
+1. (Recommended) create a `.env` file at the root of the repo with the following contents:
+```
+G_SHEETS_API_KEY=
+```
+2. (Suggested) create a virtual environment with [`venv`](https://docs.python.org/3/library/venv.html) first. Alternatively, `conda` would be fine.
+3. Install dependencies:
+```sh
+pip install -r requirements.txt
+```
+4. Test:
 ```sh
 python -m unittest discover tests/
 ```
-
-Collect and parse stats with
-
+5. Pull the latest from Google Sheets. If you have not created a `.env` file, you'll need to pass the Google Sheets API key to `get-sheets.py` using the `--g-sheets-api-key` flag.
 ```sh
 python get-sheets.py
-python main.py --season 18
 ```
-
-If you change any of the models in `models.py`, update the equivalent TS types by doing the following:
-
+6. Parse raw data to aggregate season and career stats
 ```sh
-# save JSON schemas from the models
+python main.py --season 18 # or whatever season we're on
+```
+7. If you change any of the models in `models.py`, update the JSON schemas too
+```sh
 python models.py
 ```
+
+### Deployments
+
+Stats are served with Github Pages. We rebuild stats automatically twice a day (see the Github workflow).
