@@ -24,24 +24,41 @@ Stats from the current season by league.
 
 ## Development
 
-* Python 3.10
+**Python 3.10** is required.
 
-Test with
+(Suggested) create a virtual environment with `venv` first: [link](https://docs.python.org/3/library/venv.html). Alternatively, `conda` would be fine.
+
+Install dependencies:
+
+```sh
+pip install -r requirements.txt
+```
+
+Test:
 
 ```sh
 python -m unittest discover tests/
 ```
 
-Collect and parse stats with
+Pull the latest from Google Sheets:
 
 ```sh
 python get-sheets.py
-python main.py --season 18
 ```
 
-If you change any of the models in `models.py`, update the equivalent TS types by doing the following:
+Parse raw data to aggregate season and career stats
+
+```sh
+python main.py --season 18 # or whatever season we're on
+```
+
+If you change any of the models in `models.py`, update the JSON schemas too
 
 ```sh
 # save JSON schemas from the models
 python models.py
 ```
+
+### Deployments
+
+Stats are served with Github Pages. We rebuild stats automatically twice a day (see the Github workflow).
