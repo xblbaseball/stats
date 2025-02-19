@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import math
 from pathlib import Path
 import shutil
@@ -21,6 +22,9 @@ from utils import *
 # TODO consistency between "so" and "k"
 
 LEAGUES = ["XBL", "AAA", "AA"]
+
+logger = logging.getLogger("stats/main")
+logging.basicConfig(filename="main.log", level=logging.INFO)
 
 
 class StatsAggNamespace(argparse.Namespace):
@@ -606,35 +610,38 @@ def get_active_players(players: dict[str, Player], season: int):
 
 
 def get_career_games_results(
-    game: List[str], playoffs: bool, all_active_players: List[str], league: str
+    game: List[str], playoffs: bool, league: str
 ) -> GameResults:
     away_player = game[2]
     home_player = game[7]
 
-    if away_player not in all_active_players and home_player not in all_active_players:
-        # don't care about games between two inactive players
+    try:
+        season = game[0]
+        week_or_round = game[1]
+        away_score = int(game[4])
+        home_score = int(game[5])
+        innings = maybe(game, 10, float)
+        results: GameResults = {
+            "season": season,
+            "league": league,
+            "away_player": away_player,
+            "home_player": home_player,
+            "away_score": away_score,
+            "home_score": home_score,
+            "innings": innings,
+            "winner": away_player if away_score > home_score else home_player,
+            "run_rule": True if innings is not None and innings <= 8.0 else False,
+        }
+        if playoffs:
+            results["round"] = week_or_round
+        else:
+            results["week"] = int(week_or_round)
+    except ValueError as e:
+        # something went horribly wrong. don't count this game
+        logger.warning(
+            f"Missing critical information from the following game. It could not be recorded. {', '.join(game)}"
+        )
         return None
-
-    season = game[0]
-    week_or_round = game[1]
-    away_score = int(game[4])
-    home_score = int(game[5])
-    innings = maybe(game, 10, float)
-    results: GameResults = {
-        "season": season,
-        "league": league,
-        "away_player": away_player,
-        "home_player": home_player,
-        "away_score": away_score,
-        "home_score": home_score,
-        "innings": innings,
-        "winner": away_player if away_score > home_score else home_player,
-        "run_rule": True if innings is not None and innings <= 8.0 else False,
-    }
-    if playoffs:
-        results["round"] = week_or_round
-    else:
-        results["week"] = int(week_or_round)
 
     try:
         extra_stats = {
@@ -668,7 +675,6 @@ def get_career_games_results(
 
 def collect_career_performances_and_head_to_head(
     playoffs: bool,
-    active_players_by_league: dict[str, List[str]],
     xbl_head_to_head_data: List[List[str]],
     aaa_head_to_head_data: List[List[str]],
     aa_head_to_head_data: List[List[str]],
@@ -677,42 +683,21 @@ def collect_career_performances_and_head_to_head(
     season_performances: dict[str, CareerSeasonPerformance] = {}
     season_head_to_head: dict[str, dict[str, HeadToHead]] = {}
 
-    all_active_players = [
-        player
-        for league in active_players_by_league
-        for player in active_players_by_league[league]
-    ]
-
     # get nicely formatted results
     all_xbl_games = [
         results
         for game in xbl_head_to_head_data[1:]
-        if (
-            results := get_career_games_results(
-                game, playoffs, all_active_players, "XBL"
-            )
-        )
-        is not None
+        if (results := get_career_games_results(game, playoffs, "XBL")) is not None
     ]
     all_aaa_games = [
         results
         for game in aaa_head_to_head_data[1:]
-        if (
-            results := get_career_games_results(
-                game, playoffs, all_active_players, "AAA"
-            )
-        )
-        is not None
+        if (results := get_career_games_results(game, playoffs, "AAA")) is not None
     ]
     all_aa_games = [
         results
         for game in aa_head_to_head_data[1:]
-        if (
-            results := get_career_games_results(
-                game, playoffs, all_active_players, "AA"
-            )
-        )
-        is not None
+        if (results := get_career_games_results(game, playoffs, "AA")) is not None
     ]
 
     all_game_results = [*all_xbl_games, *all_aaa_games, *all_aa_games]
@@ -955,7 +940,15 @@ def collect_career_performances_and_head_to_head(
             aaa_raw_stats_by_player.get(player, None),
             aa_raw_stats_by_player.get(player, None),
         )
-        for player in all_active_players
+        for player in list(
+            set(
+                [
+                    *xbl_raw_stats_by_player.keys(),
+                    *aaa_raw_stats_by_player.keys(),
+                    *aa_raw_stats_by_player.keys(),
+                ]
+            )
+        )
     }
 
     # do math to get career performance stats
@@ -1078,13 +1071,10 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         raw_data = json.loads(f.read())
         aa_head_to_head_data = raw_data["values"]
 
-    active_players_by_league = get_active_players(players, season)
-
     print("Tabulating career regular season stats and head to head performances...")
     season_performances, season_head_to_head = (
         collect_career_performances_and_head_to_head(
             False,
-            active_players_by_league,
             xbl_head_to_head_data,
             aaa_head_to_head_data,
             aa_head_to_head_data,
@@ -1113,7 +1103,6 @@ def build_career_stats(g_sheets_dir: Path, season: int):
     playoffs_performances, playoffs_head_to_head = (
         collect_career_performances_and_head_to_head(
             True,
-            active_players_by_league,
             xbl_playoffs_head_to_head_data,
             aaa_playoffs_head_to_head_data,
             aa_playoffs_head_to_head_data,
