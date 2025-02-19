@@ -771,28 +771,23 @@ def collect_career_performances_and_head_to_head(
         season = game["season"]
         league = game["league"]
 
-        away_is_active = away_player in all_active_players
-        home_is_active = home_player in all_active_players
-        h2h = away_is_active and home_is_active
         is_xbl_game = league == "XBL"
         is_aaa_game = league == "AAA"
         is_aa_game = league == "AA"
 
-        if away_is_active:
-            if is_xbl_game and away_player not in xbl_raw_stats_by_player:
-                xbl_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
-            elif is_aaa_game and away_player not in aaa_raw_stats_by_player:
-                aaa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
-            elif is_aa_game and away_player not in aa_raw_stats_by_player:
-                aa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+        if is_xbl_game and away_player not in xbl_raw_stats_by_player:
+            xbl_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+        elif is_aaa_game and away_player not in aaa_raw_stats_by_player:
+            aaa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+        elif is_aa_game and away_player not in aa_raw_stats_by_player:
+            aa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
 
-        if home_is_active:
-            if is_xbl_game and home_player not in xbl_raw_stats_by_player:
-                xbl_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
-            elif is_aaa_game and home_player not in aaa_raw_stats_by_player:
-                aaa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
-            elif is_aa_game and home_player not in aa_raw_stats_by_player:
-                aa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+        if is_xbl_game and home_player not in xbl_raw_stats_by_player:
+            xbl_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+        elif is_aaa_game and home_player not in aaa_raw_stats_by_player:
+            aaa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+        elif is_aa_game and home_player not in aa_raw_stats_by_player:
+            aa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
 
         # alphabetical tuple of player names
         h2h_key = tuple(sorted((home_player, away_player)))
@@ -802,21 +797,18 @@ def collect_career_performances_and_head_to_head(
         player_a_is_away = player_a == away_player
 
         # where we'll store h2h stats
-        if h2h:
-            if player_a not in head_to_head_by_players:
-                head_to_head_by_players[player_a] = {}
-            if player_z not in head_to_head_by_players[player_a]:
-                head_to_head_by_players[player_a][player_z] = {
-                    "player_a": player_a,
-                    "player_z": player_z,
-                    "player_a_raw_stats": blank_team_stats_by_game.copy(),
-                    "player_z_raw_stats": blank_team_stats_by_game.copy(),
-                }
+        if player_a not in head_to_head_by_players:
+            head_to_head_by_players[player_a] = {}
+        if player_z not in head_to_head_by_players[player_a]:
+            head_to_head_by_players[player_a][player_z] = {
+                "player_a": player_a,
+                "player_z": player_z,
+                "player_a_raw_stats": blank_team_stats_by_game.copy(),
+                "player_z_raw_stats": blank_team_stats_by_game.copy(),
+            }
 
         def add_to_player_h2h(away: bool, key: str, value: int):
             """if we need h2h for this matchup, translate home and away into player_a and player_z and record the stat"""
-            if not h2h:
-                return
             if (away and player_a_is_away) or (not away and not player_a_is_away):
                 head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
                     key
@@ -828,9 +820,6 @@ def collect_career_performances_and_head_to_head(
 
         def add_to_away(key: str, value: int):
             """record an away team stat if the away player is currently playing"""
-            if not away_is_active:
-                # also means we don't care about h2h, so it's safe to bail
-                return
             if is_xbl_game:
                 xbl_raw_stats_by_player[away_player][key] += value
             elif is_aaa_game:
@@ -841,9 +830,6 @@ def collect_career_performances_and_head_to_head(
 
         def add_to_home(key: str, value: int):
             """record a home team stat if the home player is currently playing"""
-            if not home_is_active:
-                # also means we don't care about h2h, so it's safe to bail
-                return
             if is_xbl_game:
                 xbl_raw_stats_by_player[home_player][key] += value
             elif is_aaa_game:
@@ -868,27 +854,24 @@ def collect_career_performances_and_head_to_head(
                 add_to_away("losses_by_run_rule", 1)
 
         # record which seasons were played
-        if home_is_active:
-            if is_xbl_game:
-                xbl_raw_stats_by_player[home_player]["seasons_played"].add(season)
-            if is_aaa_game:
-                aaa_raw_stats_by_player[home_player]["seasons_played"].add(season)
-            if is_aa_game:
-                aa_raw_stats_by_player[home_player]["seasons_played"].add(season)
-        if away_is_active:
-            if is_xbl_game:
-                xbl_raw_stats_by_player[away_player]["seasons_played"].add(season)
-            if is_aaa_game:
-                aaa_raw_stats_by_player[away_player]["seasons_played"].add(season)
-            if is_aa_game:
-                aa_raw_stats_by_player[away_player]["seasons_played"].add(season)
-        if h2h:
-            head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
-                "seasons_played"
-            ].add(game["season"])
-            head_to_head_by_players[player_a][player_z]["player_z_raw_stats"][
-                "seasons_played"
-            ].add(game["season"])
+        if is_xbl_game:
+            xbl_raw_stats_by_player[home_player]["seasons_played"].add(season)
+        if is_aaa_game:
+            aaa_raw_stats_by_player[home_player]["seasons_played"].add(season)
+        if is_aa_game:
+            aa_raw_stats_by_player[home_player]["seasons_played"].add(season)
+        if is_xbl_game:
+            xbl_raw_stats_by_player[away_player]["seasons_played"].add(season)
+        if is_aaa_game:
+            aaa_raw_stats_by_player[away_player]["seasons_played"].add(season)
+        if is_aa_game:
+            aa_raw_stats_by_player[away_player]["seasons_played"].add(season)
+        head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
+            "seasons_played"
+        ].add(game["season"])
+        head_to_head_by_players[player_a][player_z]["player_z_raw_stats"][
+            "seasons_played"
+        ].add(game["season"])
 
         if "away_ab" not in game or game["away_ab"] is None:
             # we're missing stats. don't count this game
