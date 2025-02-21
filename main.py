@@ -843,22 +843,22 @@ def collect_career_performances_and_head_to_head(
 
         # record which seasons were played
         if is_xbl_game:
-            xbl_raw_stats_by_player[home_player]["seasons_played"].add(season)
+            xbl_raw_stats_by_player[home_player]["seasons"].add(season)
         if is_aaa_game:
-            aaa_raw_stats_by_player[home_player]["seasons_played"].add(season)
+            aaa_raw_stats_by_player[home_player]["seasons"].add(season)
         if is_aa_game:
-            aa_raw_stats_by_player[home_player]["seasons_played"].add(season)
+            aa_raw_stats_by_player[home_player]["seasons"].add(season)
         if is_xbl_game:
-            xbl_raw_stats_by_player[away_player]["seasons_played"].add(season)
+            xbl_raw_stats_by_player[away_player]["seasons"].add(season)
         if is_aaa_game:
-            aaa_raw_stats_by_player[away_player]["seasons_played"].add(season)
+            aaa_raw_stats_by_player[away_player]["seasons"].add(season)
         if is_aa_game:
-            aa_raw_stats_by_player[away_player]["seasons_played"].add(season)
+            aa_raw_stats_by_player[away_player]["seasons"].add(season)
         head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
-            "seasons_played"
+            "seasons"
         ].add(game["season"])
         head_to_head_by_players[player_a][player_z]["player_z_raw_stats"][
-            "seasons_played"
+            "seasons"
         ].add(game["season"])
 
         if "away_ab" not in game or game["away_ab"] is None:
