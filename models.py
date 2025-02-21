@@ -98,7 +98,7 @@ class TeamStats(TypedDict):
     losses: int
     wins_by_run_rule: int
     losses_by_run_rule: int
-    num_seasons: int
+    seasons: List[int]
 
 
 class GameResults(TypedDict):
@@ -243,7 +243,8 @@ class HeadToHead(TypedDict):
 class CareerStats(TypedDict):
     """all-time stats for all players"""
 
-    players: dict[str, Player]
+    all_players: dict[str, Player]
+    active_players: dict[str, List[str]]
     season_performances: dict[str, CareerSeasonPerformance]
     """look ups should look like: [player_a][player_z] = head_to_head"""
     season_head_to_head: dict[str, dict[str, HeadToHead]]
