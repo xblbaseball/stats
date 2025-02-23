@@ -7,9 +7,11 @@ Usage:
 """
 
 import argparse
+from collections import defaultdict
 import json
 import logging
 import math
+import os
 from pathlib import Path
 import shutil
 import traceback
@@ -683,8 +685,8 @@ def collect_career_performances_and_head_to_head(
     aa_head_to_head_data: List[List[str]],
 ) -> List[HeadToHead]:
     """get career stats and head to head stats"""
-    season_performances: dict[str, CareerSeasonPerformance] = {}
-    season_head_to_head: dict[str, dict[str, HeadToHead]] = {}
+    regular_season: dict[str, CareerSeasonPerformance] = {}
+    regular_season_head_to_head: dict[str, dict[str, HeadToHead]] = {}
 
     # get nicely formatted results
     all_xbl_games = [
@@ -737,6 +739,22 @@ def collect_career_performances_and_head_to_head(
     xbl_league_innings_hitting = 0
     aaa_league_innings_hitting = 0
     aa_league_innings_hitting = 0
+    runs_by_league_by_season = {
+        "XBL": defaultdict(int),
+        "AAA": defaultdict(int),
+        "AA": defaultdict(int),
+    }
+    innings_hitting_by_league_by_season = {
+        "XBL": defaultdict(int),
+        "AAA": defaultdict(int),
+        "AA": defaultdict(int),
+    }
+
+    # {player: {season_X: league, season_Y: league}}
+    league_for_season_by_player: dict[str, dict[str, str]] = {}
+
+    # {player: {season_X: stats, season_y: stats}}
+    raw_stats_for_season_by_player: dict[str, dict[str, RawStats]] = {}
 
     # keyed on player names
     xbl_raw_stats_by_player: dict[str, RawStats] = {}
@@ -763,6 +781,26 @@ def collect_career_performances_and_head_to_head(
         is_aaa_game = league == "AAA"
         is_aa_game = league == "AA"
 
+        # track who played which season when
+        if away_player not in league_for_season_by_player:
+            league_for_season_by_player[away_player] = {}
+        if home_player not in league_for_season_by_player:
+            league_for_season_by_player[home_player] = {}
+
+        league_for_season_by_player[away_player][season] = league
+        league_for_season_by_player[home_player][season] = league
+
+        # prep to track stats by season for each player
+        if away_player not in raw_stats_for_season_by_player:
+            raw_stats_for_season_by_player[away_player] = (
+                blank_team_stats_by_game.copy()
+            )
+        if home_player not in raw_stats_for_season_by_player:
+            raw_stats_for_season_by_player[home_player] = (
+                blank_team_stats_by_game.copy()
+            )
+
+        # prep for tracking stats by league for each player
         if is_xbl_game and away_player not in xbl_raw_stats_by_player:
             xbl_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
         elif is_aaa_game and away_player not in aaa_raw_stats_by_player:
@@ -795,6 +833,9 @@ def collect_career_performances_and_head_to_head(
                 "player_z_raw_stats": blank_team_stats_by_game.copy(),
             }
 
+        def add_to_player_season(player: str, key: str, value: int):
+            raw_stats_for_season_by_player[player][key] += value
+
         def add_to_player_h2h(away: bool, key: str, value: int):
             """if we need h2h for this matchup, translate home and away into player_a and player_z and record the stat"""
             if (away and player_a_is_away) or (not away and not player_a_is_away):
@@ -815,6 +856,7 @@ def collect_career_performances_and_head_to_head(
             elif is_aa_game:
                 aa_raw_stats_by_player[away_player][key] += value
             add_to_player_h2h(True, key, value)
+            add_to_player_season(away_player, key, value)
 
         def add_to_home(key: str, value: int):
             """record a home team stat if the home player is currently playing"""
@@ -825,6 +867,7 @@ def collect_career_performances_and_head_to_head(
             elif is_aa_game:
                 aa_raw_stats_by_player[home_player][key] += value
             add_to_player_h2h(False, key, value)
+            add_to_player_season(home_player, key, value)
 
         if game["winner"] == away_player:
             add_to_away("wins", 1)
@@ -844,15 +887,12 @@ def collect_career_performances_and_head_to_head(
         # record which seasons were played
         if is_xbl_game:
             xbl_raw_stats_by_player[home_player]["seasons"].add(season)
-        if is_aaa_game:
-            aaa_raw_stats_by_player[home_player]["seasons"].add(season)
-        if is_aa_game:
-            aa_raw_stats_by_player[home_player]["seasons"].add(season)
-        if is_xbl_game:
             xbl_raw_stats_by_player[away_player]["seasons"].add(season)
         if is_aaa_game:
+            aaa_raw_stats_by_player[home_player]["seasons"].add(season)
             aaa_raw_stats_by_player[away_player]["seasons"].add(season)
         if is_aa_game:
+            aa_raw_stats_by_player[home_player]["seasons"].add(season)
             aa_raw_stats_by_player[away_player]["seasons"].add(season)
         head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
             "seasons"
@@ -870,6 +910,15 @@ def collect_career_performances_and_head_to_head(
             add_to_away("innings_pitching", math.floor(game["innings"]))
             add_to_home("innings_hitting", math.floor(game["innings"]))
             add_to_home("innings_pitching", math.ceil(game["innings"]))
+
+            runs_by_league_by_season[league][season] += game["away_r"]
+            runs_by_league_by_season[league][season] += game["home_r"]
+            innings_hitting_by_league_by_season[league][season] += math.ceil(
+                game["innings"]
+            )
+            innings_hitting_by_league_by_season[league][season] += math.floor(
+                game["innings"]
+            )
 
             # use these to calculate the league ERA
             if is_xbl_game:
@@ -936,6 +985,47 @@ def collect_career_performances_and_head_to_head(
             ],
         )
     )
+    era_by_league_by_season = {
+        "XBL": dict(
+            [
+                (
+                    season,
+                    three_digits(
+                        9
+                        * runs_by_league_by_season["XBL"][season]
+                        / innings_hitting_by_league_by_season["XBL"][season]
+                    ),
+                )
+                for season in runs_by_league_by_season["XBL"].keys()
+            ]
+        ),
+        "AAA": dict(
+            [
+                (
+                    season,
+                    three_digits(
+                        9
+                        * runs_by_league_by_season["AAA"][season]
+                        / innings_hitting_by_league_by_season["AAA"][season]
+                    ),
+                )
+                for season in runs_by_league_by_season["AAA"].keys()
+            ]
+        ),
+        "AA": dict(
+            [
+                (
+                    season,
+                    three_digits(
+                        9
+                        * runs_by_league_by_season["AA"][season]
+                        / innings_hitting_by_league_by_season["AA"][season]
+                    ),
+                )
+                for season in runs_by_league_by_season["AA"].keys()
+            ]
+        ),
+    }
 
     all_time_raw_stats_by_player = {
         player: sum_dict_tallies(
@@ -956,7 +1046,7 @@ def collect_career_performances_and_head_to_head(
 
     # do math to get career performance stats
     for player in all_time_raw_stats_by_player.keys():
-        season_performances[player] = {
+        regular_season[player] = {
             "player": player,
             "all_time": calc_stats_from_all_games(
                 all_time_raw_stats_by_player[player], all_time_league_era, player=player
@@ -984,13 +1074,34 @@ def collect_career_performances_and_head_to_head(
                     else None
                 ),
             },
+            # dict of {season_1: [list of games in that season]}
+            # but only if the player played in that season
+            "by_season": dict(
+                [
+                    (
+                        # use keys that don't start with numbers because javascript (and lodash) gets weird about keying a dict with numbers
+                        f"season_{season}",
+                        calc_stats_from_all_games(
+                            raw_stats_for_season_by_player[player][season],
+                            era_by_league_by_season[
+                                league_for_season_by_player[player][season]
+                            ][season],
+                            player=player,
+                        ),
+                    )
+                    # use XBL as a key because XBL has been played every season
+                    for season in era_by_league_by_season["XBL"].keys()
+                    # don't include seasons where someone didn't play
+                    if season in raw_stats_for_season_by_player[player]
+                ]
+            ),
         }
 
     # do math to get head to head stats
     for player_a in head_to_head_by_players.keys():
         for player_z in head_to_head_by_players[player_a]:
-            if player_a not in season_head_to_head:
-                season_head_to_head[player_a] = {}
+            if player_a not in regular_season_head_to_head:
+                regular_season_head_to_head[player_a] = {}
 
             raw_stats_a = head_to_head_by_players[player_a][player_z][
                 "player_a_raw_stats"
@@ -1000,7 +1111,7 @@ def collect_career_performances_and_head_to_head(
             ]
 
             try:
-                season_head_to_head[player_a][player_z] = {
+                regular_season_head_to_head[player_a][player_z] = {
                     "player_a": player_a,
                     "player_z": player_z,
                     "player_a_stats": calc_stats_from_all_games(
@@ -1021,7 +1132,7 @@ def collect_career_performances_and_head_to_head(
 
     # TODO still need to get playoffs player series wins, losses, championships, etc
 
-    return season_performances, season_head_to_head
+    return regular_season, regular_season_head_to_head
 
 
 def build_career_stats(g_sheets_dir: Path, season: int):
@@ -1029,9 +1140,9 @@ def build_career_stats(g_sheets_dir: Path, season: int):
     data: CareerStats = {
         "all_players": {},
         "active_players": {},
-        "season_performances": {},
-        "season_head_to_head": [],
-        "playoffs_performances": {},
+        "regular_season": {},
+        "regular_season_head_to_head": [],
+        "playoffs": {},
         "playoffs_head_to_head": [],
     }
 
@@ -1079,7 +1190,7 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         aa_head_to_head_data = raw_data["values"]
 
     print("Tabulating career regular season stats and head to head performances...")
-    season_performances, season_head_to_head = (
+    regular_season, regular_season_head_to_head = (
         collect_career_performances_and_head_to_head(
             False,
             xbl_head_to_head_data,
@@ -1088,8 +1199,8 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         )
     )
 
-    data["season_performances"] = season_performances
-    data["season_head_to_head"] = season_head_to_head
+    data["regular_season"] = regular_season
+    data["regular_season_head_to_head"] = regular_season_head_to_head
 
     xbl_playoffs_head_to_head_data = None
     with open(g_sheets_dir.joinpath("PLAYOFF_STATS__XBL%20Head%20to%20Head.json")) as f:
@@ -1107,16 +1218,14 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         aa_playoffs_head_to_head_data = raw_data["values"]
 
     print("Tabulating career playoffs stats and head to head performances...")
-    playoffs_performances, playoffs_head_to_head = (
-        collect_career_performances_and_head_to_head(
-            True,
-            xbl_playoffs_head_to_head_data,
-            aaa_playoffs_head_to_head_data,
-            aa_playoffs_head_to_head_data,
-        )
+    playoffs, playoffs_head_to_head = collect_career_performances_and_head_to_head(
+        True,
+        xbl_playoffs_head_to_head_data,
+        aaa_playoffs_head_to_head_data,
+        aa_playoffs_head_to_head_data,
     )
 
-    data["playoffs_performances"] = playoffs_performances
+    data["playoffs"] = playoffs
     data["playoffs_head_to_head"] = playoffs_head_to_head
 
     return data
@@ -1135,6 +1244,7 @@ def main(args: StatsAggNamespace):
 
     for league in LEAGUES:
         season_json = args.save_dir.joinpath(f"{league}__s{args.season}.json")
+        print(f"Writing {season_json}...")
         with open(season_json, "w") as f:
             f.write(json.dumps(season_data[league], cls=SafeEncoder))
 
@@ -1142,8 +1252,13 @@ def main(args: StatsAggNamespace):
 
     career_data = build_career_stats(args.g_sheets_dir, args.season)
 
-    with open(args.save_dir.joinpath("careers.json"), "w") as f:
+    career_json = args.save_dir.joinpath("careers.json")
+    print(f"Writing {career_json}...")
+    with open(career_json, "w") as f:
         f.write(json.dumps(career_data, cls=SafeEncoder))
+
+    career_file_size = os.path.getsize(career_json)
+    print(f"careers.json filesize: {math.floor(career_file_size / 1000000)}MB")
 
     if len(args.query) > 0:
         try:
