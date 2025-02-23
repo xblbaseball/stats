@@ -220,6 +220,7 @@ class CareerSeasonPerformance(TypedDict):
 
     player: str
     by_league: dict[str, CareerSeasonStats]
+    by_season: dict[int, CareerSeasonStats]
     all_time: CareerSeasonStats
 
 
@@ -245,10 +246,10 @@ class CareerStats(TypedDict):
 
     all_players: dict[str, Player]
     active_players: dict[str, List[str]]
-    season_performances: dict[str, CareerSeasonPerformance]
+    regular_season: dict[str, CareerSeasonPerformance]
     """look ups should look like: [player_a][player_z] = head_to_head"""
-    season_head_to_head: dict[str, dict[str, HeadToHead]]
-    playoffs_performances: dict[str, CareerPlayoffsPerformance]
+    regular_season_head_to_head: dict[str, dict[str, HeadToHead]]
+    playoffs: dict[str, CareerPlayoffsPerformance]
     playoffs_head_to_head: List[HeadToHead]
 
 
