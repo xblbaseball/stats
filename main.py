@@ -1078,21 +1078,21 @@ def collect_career_performances_and_head_to_head(
                 all_time_raw_stats_by_player[player], all_time_league_era, player=player
             ),
             "by_league": {
-                "xbl": (
+                "XBL": (
                     calc_stats_from_all_games(
                         xbl_raw_stats_by_player[player], xbl_league_era, player=player
                     )
                     if player in xbl_raw_stats_by_player
                     else None
                 ),
-                "aaa": (
+                "AAA": (
                     calc_stats_from_all_games(
                         aaa_raw_stats_by_player[player], aaa_league_era, player=player
                     )
                     if player in aaa_raw_stats_by_player
                     else None
                 ),
-                "aa": (
+                "AA": (
                     calc_stats_from_all_games(
                         aa_raw_stats_by_player[player], aa_league_era, player=player
                     )
