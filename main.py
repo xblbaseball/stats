@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 from collections import defaultdict
+import copy
 import json
 import logging
 import math
@@ -349,9 +350,9 @@ def calc_team_stats(game_results: List[GameResults]):
         away = game["away_team"]
         home = game["home_team"]
         if away not in raw_stats_by_team:
-            raw_stats_by_team[away] = blank_team_stats_by_game.copy()
+            raw_stats_by_team[away] = copy.deepcopy(blank_team_stats_by_game)
         if home not in raw_stats_by_team:
-            raw_stats_by_team[home] = blank_team_stats_by_game.copy()
+            raw_stats_by_team[home] = copy.deepcopy(blank_team_stats_by_game)
 
         if game["winner"] == away:
             raw_stats_by_team[away]["wins"] += 1
@@ -371,8 +372,8 @@ def calc_team_stats(game_results: List[GameResults]):
             # we're missing stats. don't count this game
             continue
 
-        away_stats = raw_stats_by_team[away].copy()
-        home_stats = raw_stats_by_team[home].copy()
+        away_stats = copy.deepcopy(raw_stats_by_team[away])
+        home_stats = copy.deepcopy(raw_stats_by_team[home])
 
         away_stats["innings_hitting"] += math.ceil(game["innings"])
         away_stats["innings_pitching"] += math.floor(game["innings"])
@@ -464,8 +465,12 @@ def collect_playoffs_team_records(results: List[PlayoffsGameResults]):
                 "opponent": home_team,
             }
 
-        home_round_record = records_by_team[home_team]["rounds"][this_round].copy()
-        away_round_record = records_by_team[away_team]["rounds"][this_round].copy()
+        home_round_record = copy.deepcopy(
+            records_by_team[home_team]["rounds"][this_round]
+        )
+        away_round_record = copy.deepcopy(
+            records_by_team[away_team]["rounds"][this_round]
+        )
 
         winner = away_team if game["away_score"] > game["home_score"] else home_team
 
@@ -775,6 +780,8 @@ def collect_career_performances_and_head_to_head(
         away_player = game["away_player"]
         home_player = game["home_player"]
         season = game["season"]
+        # this will eventually be turned into JSON, and TS/lodash is weird about dict keys that are numbers
+        season_key = f"season_{season}"
         league = game["league"]
 
         is_xbl_game = league == "XBL"
@@ -787,33 +794,50 @@ def collect_career_performances_and_head_to_head(
         if home_player not in league_for_season_by_player:
             league_for_season_by_player[home_player] = {}
 
-        league_for_season_by_player[away_player][season] = league
-        league_for_season_by_player[home_player][season] = league
+        league_for_season_by_player[away_player][season_key] = league
+        league_for_season_by_player[home_player][season_key] = league
 
         # prep to track stats by season for each player
         if away_player not in raw_stats_for_season_by_player:
-            raw_stats_for_season_by_player[away_player] = (
-                blank_team_stats_by_game.copy()
-            )
+            raw_stats_for_season_by_player[away_player] = {}
         if home_player not in raw_stats_for_season_by_player:
-            raw_stats_for_season_by_player[home_player] = (
-                blank_team_stats_by_game.copy()
+            raw_stats_for_season_by_player[home_player] = {}
+
+        if season_key not in raw_stats_for_season_by_player[away_player]:
+            raw_stats_for_season_by_player[away_player][season_key] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
+        if season_key not in raw_stats_for_season_by_player[home_player]:
+            raw_stats_for_season_by_player[home_player][season_key] = copy.deepcopy(
+                blank_team_stats_by_game
             )
 
         # prep for tracking stats by league for each player
         if is_xbl_game and away_player not in xbl_raw_stats_by_player:
-            xbl_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+            xbl_raw_stats_by_player[away_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
         elif is_aaa_game and away_player not in aaa_raw_stats_by_player:
-            aaa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+            aaa_raw_stats_by_player[away_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
         elif is_aa_game and away_player not in aa_raw_stats_by_player:
-            aa_raw_stats_by_player[away_player] = blank_team_stats_by_game.copy()
+            aa_raw_stats_by_player[away_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
 
         if is_xbl_game and home_player not in xbl_raw_stats_by_player:
-            xbl_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+            xbl_raw_stats_by_player[home_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
         elif is_aaa_game and home_player not in aaa_raw_stats_by_player:
-            aaa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+            aaa_raw_stats_by_player[home_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
         elif is_aa_game and home_player not in aa_raw_stats_by_player:
-            aa_raw_stats_by_player[home_player] = blank_team_stats_by_game.copy()
+            aa_raw_stats_by_player[home_player] = copy.deepcopy(
+                blank_team_stats_by_game
+            )
 
         # alphabetical tuple of player names
         h2h_key = tuple(sorted((home_player, away_player)))
@@ -829,12 +853,12 @@ def collect_career_performances_and_head_to_head(
             head_to_head_by_players[player_a][player_z] = {
                 "player_a": player_a,
                 "player_z": player_z,
-                "player_a_raw_stats": blank_team_stats_by_game.copy(),
-                "player_z_raw_stats": blank_team_stats_by_game.copy(),
+                "player_a_raw_stats": copy.deepcopy(blank_team_stats_by_game),
+                "player_z_raw_stats": copy.deepcopy(blank_team_stats_by_game),
             }
 
         def add_to_player_season(player: str, key: str, value: int):
-            raw_stats_for_season_by_player[player][key] += value
+            raw_stats_for_season_by_player[player][season_key][key] += value
 
         def add_to_player_h2h(away: bool, key: str, value: int):
             """if we need h2h for this matchup, translate home and away into player_a and player_z and record the stat"""
@@ -896,10 +920,12 @@ def collect_career_performances_and_head_to_head(
             aa_raw_stats_by_player[away_player]["seasons"].add(season)
         head_to_head_by_players[player_a][player_z]["player_a_raw_stats"][
             "seasons"
-        ].add(game["season"])
+        ].add(season)
         head_to_head_by_players[player_a][player_z]["player_z_raw_stats"][
             "seasons"
-        ].add(game["season"])
+        ].add(season)
+        raw_stats_for_season_by_player[away_player][season_key]["seasons"].add(season)
+        raw_stats_for_season_by_player[home_player][season_key]["seasons"].add(season)
 
         if "away_ab" not in game or game["away_ab"] is None:
             # we're missing stats. don't count this game
@@ -911,12 +937,12 @@ def collect_career_performances_and_head_to_head(
             add_to_home("innings_hitting", math.floor(game["innings"]))
             add_to_home("innings_pitching", math.ceil(game["innings"]))
 
-            runs_by_league_by_season[league][season] += game["away_r"]
-            runs_by_league_by_season[league][season] += game["home_r"]
-            innings_hitting_by_league_by_season[league][season] += math.ceil(
+            runs_by_league_by_season[league][season_key] += game["away_r"]
+            runs_by_league_by_season[league][season_key] += game["home_r"]
+            innings_hitting_by_league_by_season[league][season_key] += math.ceil(
                 game["innings"]
             )
-            innings_hitting_by_league_by_season[league][season] += math.floor(
+            innings_hitting_by_league_by_season[league][season_key] += math.floor(
                 game["innings"]
             )
 
@@ -989,40 +1015,40 @@ def collect_career_performances_and_head_to_head(
         "XBL": dict(
             [
                 (
-                    season,
+                    season_key,
                     three_digits(
                         9
-                        * runs_by_league_by_season["XBL"][season]
-                        / innings_hitting_by_league_by_season["XBL"][season]
+                        * runs_by_league_by_season["XBL"][season_key]
+                        / innings_hitting_by_league_by_season["XBL"][season_key]
                     ),
                 )
-                for season in runs_by_league_by_season["XBL"].keys()
+                for season_key in runs_by_league_by_season["XBL"].keys()
             ]
         ),
         "AAA": dict(
             [
                 (
-                    season,
+                    season_key,
                     three_digits(
                         9
-                        * runs_by_league_by_season["AAA"][season]
-                        / innings_hitting_by_league_by_season["AAA"][season]
+                        * runs_by_league_by_season["AAA"][season_key]
+                        / innings_hitting_by_league_by_season["AAA"][season_key]
                     ),
                 )
-                for season in runs_by_league_by_season["AAA"].keys()
+                for season_key in runs_by_league_by_season["AAA"].keys()
             ]
         ),
         "AA": dict(
             [
                 (
-                    season,
+                    season_key,
                     three_digits(
                         9
-                        * runs_by_league_by_season["AA"][season]
-                        / innings_hitting_by_league_by_season["AA"][season]
+                        * runs_by_league_by_season["AA"][season_key]
+                        / innings_hitting_by_league_by_season["AA"][season_key]
                     ),
                 )
-                for season in runs_by_league_by_season["AA"].keys()
+                for season_key in runs_by_league_by_season["AA"].keys()
             ]
         ),
     }
@@ -1080,19 +1106,19 @@ def collect_career_performances_and_head_to_head(
                 [
                     (
                         # use keys that don't start with numbers because javascript (and lodash) gets weird about keying a dict with numbers
-                        f"season_{season}",
+                        sk,
                         calc_stats_from_all_games(
-                            raw_stats_for_season_by_player[player][season],
+                            raw_stats_for_season_by_player[player][sk],
                             era_by_league_by_season[
-                                league_for_season_by_player[player][season]
-                            ][season],
+                                league_for_season_by_player[player][sk]
+                            ][sk],
                             player=player,
                         ),
                     )
                     # use XBL as a key because XBL has been played every season
-                    for season in era_by_league_by_season["XBL"].keys()
+                    for sk in era_by_league_by_season["XBL"].keys()
                     # don't include seasons where someone didn't play
-                    if season in raw_stats_for_season_by_player[player]
+                    if sk in raw_stats_for_season_by_player[player]
                 ]
             ),
         }
@@ -1189,7 +1215,9 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         raw_data = json.loads(f.read())
         aa_head_to_head_data = raw_data["values"]
 
-    print("Tabulating career regular season stats and head to head performances...")
+    print(
+        "Tabulating career regular season stats, stats by season, stats by league, and head to head performances..."
+    )
     regular_season, regular_season_head_to_head = (
         collect_career_performances_and_head_to_head(
             False,
