@@ -151,7 +151,7 @@ def collect_team_records(
     return team_records
 
 
-def collect_game_results(playoffs: bool, box_score_data: List[List[str]]):
+def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league: str):
     """convert the Box%20Score and Playoffs spreadsheet tabs into structured data"""
     if playoffs:
         game_results: List[PlayoffsGameResults] = []
@@ -175,6 +175,7 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]]):
             "innings": innings,
             "winner": away_team if away_score > home_score else home_team,
             "run_rule": innings <= 8.0,
+            "league": league,
         }
         if playoffs:
             results["round"] = game[0]
@@ -516,7 +517,7 @@ def build_season_stats(league: str, g_sheets_dir: Path, season: int) -> SeasonSt
         raw_data = json.loads(f.read())
         season_scores_data = raw_data["values"]
 
-    season_game_results = collect_game_results(False, season_scores_data)
+    season_game_results = collect_game_results(False, season_scores_data, league)
     data["season_game_results"] = season_game_results
     data["season_team_stats"] = calc_team_stats(season_game_results)
 
