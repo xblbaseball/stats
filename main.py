@@ -591,6 +591,7 @@ def collect_players(
 
         players[player]["teams"].append(
             {
+                "player": player,
                 "team_name": team_name,
                 "team_abbrev": team_abbrev,
                 "league": "AA",
@@ -606,15 +607,17 @@ def collect_players(
     return players
 
 
-def get_active_players(players: dict[str, Player], season: int):
+def get_active_players(
+    players: dict[str, Player], season: int
+) -> dict[str, List[TeamSeason]]:
     """get the players (usernames) who are playing this season. assumes a player is only in 1 league per season"""
 
-    active_players: dict[str, List[str]] = {"XBL": [], "AAA": [], "AA": []}
+    active_players: dict[str, List[TeamSeason]] = {"XBL": [], "AAA": [], "AA": []}
 
     for player_name in players:
         for team in players[player_name]["teams"]:
             if team["season"] == season:
-                active_players[team["league"]].append(player_name)
+                active_players[team["league"]].append(team)
                 break
 
     return active_players

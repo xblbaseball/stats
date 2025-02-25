@@ -184,6 +184,7 @@ class SeasonStats(TypedDict):
 class TeamSeason(TypedDict):
     """pairing between a person and a season in XBL"""
 
+    player: str
     team_name: str
     team_abbrev: str
     league: str
@@ -245,7 +246,7 @@ class CareerStats(TypedDict):
     """all-time stats for all players"""
 
     all_players: dict[str, Player]
-    active_players: dict[str, List[str]]
+    active_players: dict[str, List[TeamSeason]]
     regular_season: dict[str, CareerSeasonPerformance]
     """look ups should look like: [player_a][player_z] = head_to_head"""
     regular_season_head_to_head: dict[str, dict[str, HeadToHead]]
