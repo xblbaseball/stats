@@ -555,6 +555,7 @@ def collect_players(
 
         players[player]["teams"].append(
             {
+                "player": player,
                 "team_name": team_name,
                 "team_abbrev": team_abbrev,
                 "league": "XBL",
@@ -573,6 +574,7 @@ def collect_players(
 
         players[player]["teams"].append(
             {
+                "player": player,
                 "team_name": team_name,
                 "team_abbrev": team_abbrev,
                 "league": "AAA",

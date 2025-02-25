@@ -293,7 +293,7 @@ def main(args: ModelArgs):
 
     print(f"Wrote {season_path}")
 
-    career_path = args.out_dir.joinpath("career-schema.json")
+    career_path = args.out_dir.joinpath("careers-schema.json")
     with open(career_path, "w") as f:
         f.write(json.dumps(career_schema))
 
