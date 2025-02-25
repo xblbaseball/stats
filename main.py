@@ -526,7 +526,7 @@ def build_season_stats(league: str, g_sheets_dir: Path, season: int) -> SeasonSt
         raw_data = json.loads(f.read())
         playoffs_scores_data = raw_data["values"]
 
-    playoffs_game_results = collect_game_results(True, playoffs_scores_data)
+    playoffs_game_results = collect_game_results(True, playoffs_scores_data, league)
     data["playoffs_game_results"] = playoffs_game_results
     data["playoffs_team_records"] = collect_playoffs_team_records(playoffs_game_results)
 
