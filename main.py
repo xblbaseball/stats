@@ -41,7 +41,9 @@ def arg_parser():
     parser = argparse.ArgumentParser(
         description="Aggregate high-level XBL stats per-season and for careers"
     )
-    parser.add_argument("-s", "--season", type=int, help="Current season")
+    parser.add_argument(
+        "-s", "--season", type=int, required=True, help="Current season"
+    )
     parser.add_argument(
         "--g-sheets-dir",
         "-g",
@@ -129,7 +131,7 @@ def collect_team_records(
             "losses": int(row[get_row(3)]),
             "gb": 0.0 if row[get_row(4)] == "-" else float(row[get_row(4)]),
             "win_pct": float(row[get_row(5)]),
-            "win_pct_vs_500": float(row[get_row(6)]),
+            "win_pct_vs_500": 0.0 if row[get_row(6)] == "-" else float(row[get_row(6)]),
             "sweeps_w": int(row[get_row(7)]),
             "splits": int(row[get_row(8)]),
             "sweeps_l": int(row[get_row(9)]),
@@ -423,7 +425,12 @@ def calc_team_stats(game_results: List[GameResults]):
         raw_stats_by_team[away] = away_stats
         raw_stats_by_team[home] = home_stats
 
-    league_era = three_digits(9 * league_runs / league_innings_hitting)
+    league_era = (
+        three_digits(9 * league_runs / league_innings_hitting)
+        # before the season starts, we have no innings hitting
+        if league_innings_hitting > 0
+        else 0.0
+    )
 
     # do math to get aggregate stats
     for team in raw_stats_by_team.keys():
