@@ -41,7 +41,9 @@ def arg_parser():
     parser = argparse.ArgumentParser(
         description="Aggregate high-level XBL stats per-season and for careers"
     )
-    parser.add_argument("-s", "--season", type=int, help="Current season")
+    parser.add_argument(
+        "-s", "--season", type=int, required=True, help="Current season"
+    )
     parser.add_argument(
         "--g-sheets-dir",
         "-g",
