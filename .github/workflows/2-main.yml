@@ -7,7 +7,7 @@ on:
   # run this workflow at 5a and 5p eastern every day
   schedule:
     # server is in UTC
-    - cron: "0 10,22 * * *"
+    - cron: "0 10,20 * * *"
   # run manually from the Actions tab
   workflow_dispatch:
 
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   collect-stats:
-    name: Collect data from sheets
+    name: Collect data from sheets and parse
     runs-on: ubuntu-latest
     environment: production
     steps:
