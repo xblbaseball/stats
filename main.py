@@ -250,16 +250,16 @@ def calc_stats_from_all_games(
         "rs9": per_9_hitting("r", 2),
         "ba": (three_digits(raw_stats["h"] / raw_stats["ab"])),
         "ab": raw_stats["ab"],
-        "ab9": per_9_hitting("ab", 9),
+        "ab9": per_9_hitting("ab", 2),
         "h": raw_stats["h"],
         "h9": per_9_hitting("h"),
         "hr": raw_stats["hr"],
-        "hr9": per_9_hitting("hr", 9),
+        "hr9": per_9_hitting("hr", 2),
         "abhr": (three_digits(raw_stats["ab"] / raw_stats["hr"])),
         "so": raw_stats["so"],
-        "so9": per_9_hitting("so", 9),
+        "so9": per_9_hitting("so", 2),
         "bb": raw_stats["bb"],
-        "bb9": per_9_hitting("bb"),
+        "bb9": per_9_hitting("bb", 2),
         "obp": three_digits(
             (raw_stats["h"] + raw_stats["bb"]) / (raw_stats["ab"] + raw_stats["bb"])
         ),
@@ -279,9 +279,9 @@ def calc_stats_from_all_games(
         "opphr9": per_9_pitching("opphr", 2),
         "oppabhr": (three_digits(raw_stats["ab"] / raw_stats["hr"])),
         "oppk": raw_stats["oppso"],
-        "oppk9": per_9_pitching("oppso", 9),
+        "oppk9": per_9_pitching("oppso", 2),
         "oppbb": raw_stats["oppbb"],
-        "oppbb9": per_9_pitching("oppbb", 9),
+        "oppbb9": per_9_pitching("oppbb", 2),
         "whip": three_digits(
             (raw_stats["opph"] + raw_stats["oppbb"]) / raw_stats["innings_pitching"]
         ),
