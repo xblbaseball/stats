@@ -70,6 +70,12 @@ def arg_parser():
     return parser
 
 
+def two_digits(x: int | float | None) -> int | float:
+    if x is None:
+        return None
+    return round(x, 2)
+
+
 def three_digits(x: int | float | None) -> int | float:
     if x is None:
         return None
@@ -220,11 +226,15 @@ def calc_stats_from_all_games(
     raw_stats: RawStats, league_era: float, team="", player=""
 ) -> TeamStats:
     """given everything a player/team did across all games, calculate stat lines"""
-    per_9_hitting = lambda key: three_digits(
-        (raw_stats[key] / raw_stats["innings_hitting"]) * 9
+    per_9_hitting = lambda key, digits=3: (
+        three_digits((raw_stats[key] / raw_stats["innings_hitting"]) * 9)
+        if digits == 3
+        else two_digits((raw_stats[key] / raw_stats["innings_hitting"]) * 9)
     )
-    per_9_pitching = lambda key: three_digits(
-        (raw_stats[key] / raw_stats["innings_pitching"]) * 9
+    per_9_pitching = lambda key, digits=3: (
+        three_digits((raw_stats[key] / raw_stats["innings_pitching"]) * 9)
+        if digits == 3
+        else two_digits((raw_stats[key] / raw_stats["innings_pitching"]) * 9)
     )
 
     # use Nones as blackholes. if any stat turns to None, it stays None without raising any errors
@@ -237,19 +247,19 @@ def calc_stats_from_all_games(
         "player": player,
         # hitting
         "rs": raw_stats["r"],
-        "rs9": per_9_hitting("r"),
+        "rs9": per_9_hitting("r", 2),
         "ba": (three_digits(raw_stats["h"] / raw_stats["ab"])),
         "ab": raw_stats["ab"],
-        "ab9": per_9_hitting("ab"),
+        "ab9": per_9_hitting("ab", 2),
         "h": raw_stats["h"],
         "h9": per_9_hitting("h"),
         "hr": raw_stats["hr"],
-        "hr9": per_9_hitting("hr"),
+        "hr9": per_9_hitting("hr", 2),
         "abhr": (three_digits(raw_stats["ab"] / raw_stats["hr"])),
         "so": raw_stats["so"],
-        "so9": per_9_hitting("so"),
+        "so9": per_9_hitting("so", 2),
         "bb": raw_stats["bb"],
-        "bb9": per_9_hitting("bb"),
+        "bb9": per_9_hitting("bb", 2),
         "obp": three_digits(
             (raw_stats["h"] + raw_stats["bb"]) / (raw_stats["ab"] + raw_stats["bb"])
         ),
@@ -260,18 +270,18 @@ def calc_stats_from_all_games(
         ),
         # pitching
         "ra": raw_stats["oppr"],
-        "ra9": per_9_pitching("oppr"),
+        "ra9": per_9_pitching("oppr", 2),
         "oppba": (three_digits(raw_stats["opph"] / raw_stats["oppab"])),
-        "oppab9": per_9_pitching("oppab"),
+        "oppab9": per_9_pitching("oppab", 2),
         "opph": raw_stats["opph"],
-        "opph9": per_9_pitching("opph"),
+        "opph9": per_9_pitching("opph", 2),
         "opphr": raw_stats["opphr"],
-        "opphr9": per_9_pitching("opphr"),
+        "opphr9": per_9_pitching("opphr", 2),
         "oppabhr": (three_digits(raw_stats["ab"] / raw_stats["hr"])),
         "oppk": raw_stats["oppso"],
-        "oppk9": per_9_pitching("oppso"),
+        "oppk9": per_9_pitching("oppso", 2),
         "oppbb": raw_stats["oppbb"],
-        "oppbb9": per_9_pitching("oppbb"),
+        "oppbb9": per_9_pitching("oppbb", 2),
         "whip": three_digits(
             (raw_stats["opph"] + raw_stats["oppbb"]) / raw_stats["innings_pitching"]
         ),
@@ -295,10 +305,10 @@ def calc_stats_from_all_games(
         # mixed
         "rd": raw_stats["r"] - raw_stats["oppr"],
         # TODO is this right?
-        "rd9": (three_digits(per_9_hitting("r") - per_9_pitching("oppr"))),
+        "rd9": (two_digits(per_9_hitting("r") - per_9_pitching("oppr"))),
         "innings_played": (raw_stats["innings_hitting"] + raw_stats["innings_pitching"])
         / 2,
-        "innings_game": three_digits(
+        "innings_game": two_digits(
             ((raw_stats["innings_hitting"] + raw_stats["innings_pitching"]) / 2)
             / raw_stats["games_played"]
         ),
