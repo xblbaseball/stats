@@ -277,12 +277,12 @@ def calc_stats_from_all_games(
         "opph9": per_9_pitching("opph", 2),
         "opphr": raw_stats["opphr"],
         "opphr9": per_9_pitching("opphr", 2),
-        "oppabhr": (three_digits(raw_stats["ab"] / raw_stats["hr"])),
+        "oppabhr": (two_digits(raw_stats["ab"] / raw_stats["hr"])),
         "oppk": raw_stats["oppso"],
         "oppk9": per_9_pitching("oppso", 2),
         "oppbb": raw_stats["oppbb"],
         "oppbb9": per_9_pitching("oppbb", 2),
-        "whip": three_digits(
+        "whip": two_digits(
             (raw_stats["opph"] + raw_stats["oppbb"]) / raw_stats["innings_pitching"]
         ),
         "lob": three_digits(
@@ -291,7 +291,7 @@ def calc_stats_from_all_games(
         ),
         "e": None,
         # TODO is this right?
-        "fip": three_digits(
+        "fip": two_digits(
             SafeNum(league_era)
             - (
                 (
