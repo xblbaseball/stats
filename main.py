@@ -170,25 +170,30 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league
     get_col = lambda c: c if playoffs else c + 2
 
     for game in box_score_data[1:]:
-        away_team = game[1]
-        home_team = game[4]
-        away_score = int(game[2])
-        home_score = int(game[3])
-        innings = float(game[get_col(5)])
-        results = {
-            "away_team": away_team,
-            "home_team": home_team,
-            "away_score": away_score,
-            "home_score": home_score,
-            "innings": innings,
-            "winner": away_team if away_score > home_score else home_team,
-            "run_rule": innings <= 8.0,
-            "league": league,
-        }
-        if playoffs:
-            results["round"] = game[0]
-        else:
-            results["week"] = int(game[0])
+        try:
+            away_team = game[1]
+            home_team = game[4]
+            away_score = int(game[2])
+            home_score = int(game[3])
+            innings = float(game[get_col(5)])
+            results = {
+                "away_team": away_team,
+                "home_team": home_team,
+                "away_score": away_score,
+                "home_score": home_score,
+                "innings": innings,
+                "winner": away_team if away_score > home_score else home_team,
+                "run_rule": innings <= 8.0,
+                "league": league,
+            }
+            if playoffs:
+                results["round"] = game[0]
+            else:
+                results["week"] = int(game[0])
+        except ValueError as e:
+            print("Something is horribly wrong with this game:")
+            print(game)
+            continue
 
         try:
             extra_stats = {
