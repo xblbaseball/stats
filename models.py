@@ -3,7 +3,9 @@ import json
 from pathlib import Path
 import pydantic
 from typing_extensions import TypedDict
-from typing import List
+from typing import List, TypeAlias
+
+League: TypeAlias = str
 
 
 class TeamRecord(TypedDict):
@@ -105,7 +107,7 @@ class GameResults(TypedDict):
     """what happened in a single game"""
 
     season: int
-    league: str
+    league: League
     home_team: str
     away_team: str
     home_player: str
@@ -187,7 +189,7 @@ class TeamSeason(TypedDict):
     player: str
     team_name: str
     team_abbrev: str
-    league: str
+    league: League
     season: int
 
 
@@ -220,7 +222,7 @@ class CareerSeasonPerformance(TypedDict):
     """how someone has performed in the regular season over their career"""
 
     player: str
-    by_league: dict[str, CareerSeasonStats]
+    by_league: dict[League, CareerSeasonStats]
     by_season: dict[int, CareerSeasonStats]
     all_time: CareerSeasonStats
 
@@ -229,7 +231,7 @@ class CareerPlayoffsPerformance(TypedDict):
     """how someone has performed in the playoffs over their career"""
 
     player: str
-    by_league: dict[str, CareerPlayoffsStats]
+    by_league: dict[League, CareerPlayoffsStats]
     all_time: CareerPlayoffsStats
 
 
@@ -246,7 +248,7 @@ class CareerStats(TypedDict):
     """all-time stats for all players"""
 
     all_players: dict[str, Player]
-    active_players: dict[str, List[TeamSeason]]
+    active_players: dict[League, List[TeamSeason]]
     regular_season: dict[str, CareerSeasonPerformance]
     """look ups should look like: [player_a][player_z] = head_to_head"""
     regular_season_head_to_head: dict[str, dict[str, HeadToHead]]
