@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import shutil
 import traceback
-from typing import List
+from typing import Callable, List
 
 from models import *
 from utils import *
@@ -70,19 +70,19 @@ def arg_parser():
     return parser
 
 
-def two_digits(x: int | float | None) -> int | float:
+def two_digits(x: int | float | None) -> int | float | None:
     if x is None:
         return None
     return round(x, 2)
 
 
-def three_digits(x: int | float | None) -> int | float:
+def three_digits(x: int | float | None) -> int | float | None:
     if x is None:
         return None
     return round(x, 3)
 
 
-def maybe(row: List[str], col: int, type: callable):
+def maybe(row: List[str], col: int, type: Callable):
     """Do our best to get the stat. But it might be missing, in which case return None"""
     ret = None
     try:
