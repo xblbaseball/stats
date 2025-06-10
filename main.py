@@ -15,6 +15,7 @@ import math
 import os
 from pathlib import Path
 import shutil
+import tqdm
 import traceback
 from typing import Callable, List
 
@@ -197,8 +198,8 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league
 
         try:
             extra_stats = {
-                "away_e": None if playoffs else int(game[5]),
-                "home_e": None if playoffs else int(game[6]),
+                "away_e": 0 if playoffs else int(game[5]),
+                "home_e": 0 if playoffs else int(game[6]),
                 # not all of these are always recorded. missing records are probably from disconnects
                 "away_ab": maybe(game, get_col(6), int),
                 "away_r": maybe(game, get_col(7), int),
@@ -364,7 +365,7 @@ def calc_team_stats(game_results: List[GameResults]):
     league_innings_hitting = 0
 
     # collect stats by team by looking at each game
-    for game in game_results:
+    for game in tqdm.tqdm(game_results, desc="Games for team stats", unit="gm"):
         away = game["away_team"]
         home = game["home_team"]
         if away not in raw_stats_by_team:
@@ -403,56 +404,63 @@ def calc_team_stats(game_results: List[GameResults]):
         league_innings_hitting += away_stats["innings_hitting"]
         league_innings_hitting += home_stats["innings_hitting"]
 
-        # capture away team stats
-        away_stats["games_played"] += 1
-        away_stats["ab"] += game["away_ab"]
-        away_stats["r"] += game["away_r"]
-        away_stats["h"] += game["away_hits"]
-        away_stats["hr"] += game["away_hr"]
-        away_stats["rbi"] += game["away_rbi"]
-        away_stats["bb"] += game["away_bb"]
-        away_stats["so"] += game["away_so"]
-        away_stats["oppab"] += game["home_ab"]
-        away_stats["oppr"] += game["home_r"]
-        away_stats["opph"] += game["home_hits"]
-        away_stats["opphr"] += game["home_hr"]
-        away_stats["opprbi"] += game["home_rbi"]
-        away_stats["oppbb"] += game["home_bb"]
-        away_stats["oppso"] += game["home_so"]
+        try:
+            # capture away team stats
+            away_stats["games_played"] += 1
+            away_stats["ab"] += game["away_ab"]
+            away_stats["r"] += game["away_r"]
+            away_stats["h"] += game["away_hits"]
+            away_stats["hr"] += game["away_hr"]
+            away_stats["rbi"] += game["away_rbi"]
+            away_stats["bb"] += game["away_bb"]
+            away_stats["so"] += game["away_so"]
+            away_stats["oppab"] += game["home_ab"]
+            away_stats["oppr"] += game["home_r"]
+            away_stats["opph"] += game["home_hits"]
+            away_stats["opphr"] += game["home_hr"]
+            away_stats["opprbi"] += game["home_rbi"]
+            away_stats["oppbb"] += game["home_bb"]
+            away_stats["oppso"] += game["home_so"]
 
-        # capture home team stats
-        home_stats["games_played"] += 1
-        home_stats["ab"] += game["home_ab"]
-        home_stats["r"] += game["home_r"]
-        home_stats["h"] += game["home_hits"]
-        home_stats["hr"] += game["home_hr"]
-        home_stats["rbi"] += game["home_rbi"]
-        home_stats["bb"] += game["home_bb"]
-        home_stats["so"] += game["home_so"]
-        home_stats["oppab"] += game["away_ab"]
-        home_stats["oppr"] += game["away_r"]
-        home_stats["opph"] += game["away_hits"]
-        home_stats["opphr"] += game["away_hr"]
-        home_stats["opprbi"] += game["away_rbi"]
-        home_stats["oppbb"] += game["away_bb"]
-        home_stats["oppso"] += game["away_so"]
+            # capture home team stats
+            home_stats["games_played"] += 1
+            home_stats["ab"] += game["home_ab"]
+            home_stats["r"] += game["home_r"]
+            home_stats["h"] += game["home_hits"]
+            home_stats["hr"] += game["home_hr"]
+            home_stats["rbi"] += game["home_rbi"]
+            home_stats["bb"] += game["home_bb"]
+            home_stats["so"] += game["home_so"]
+            home_stats["oppab"] += game["away_ab"]
+            home_stats["oppr"] += game["away_r"]
+            home_stats["opph"] += game["away_hits"]
+            home_stats["opphr"] += game["away_hr"]
+            home_stats["opprbi"] += game["away_rbi"]
+            home_stats["oppbb"] += game["away_bb"]
+            home_stats["oppso"] += game["away_so"]
 
-        raw_stats_by_team[away] = away_stats
-        raw_stats_by_team[home] = home_stats
+            raw_stats_by_team[away] = away_stats
+            raw_stats_by_team[home] = home_stats
 
-    league_era = (
-        three_digits(9 * league_runs / league_innings_hitting)
-        # before the season starts, we have no innings hitting
-        if league_innings_hitting > 0
-        else 0.0
-    )
+            league_era = (
+                three_digits(9 * league_runs / league_innings_hitting)
+                # before the season starts, we have no innings hitting
+                if int(league_innings_hitting) > 0
+                else 0.0
+            )
 
-    # do math to get aggregate stats
-    for team in raw_stats_by_team.keys():
-        raw_stats = raw_stats_by_team[team]
-        stats_by_team[team] = calc_stats_from_all_games(
-            raw_stats, league_era, team=team
-        )
+            # do math to get aggregate stats
+            for team in raw_stats_by_team.keys():
+                raw_stats = raw_stats_by_team[team]
+                stats_by_team[team] = calc_stats_from_all_games(
+                    raw_stats, league_era, team=team
+                )
+        except TypeError as e:
+            print("Something went wrong grabbing stats for this game. Not counting them")
+            print(game)
+            traceback.print_exc()
+            exit(1)
+
 
     return stats_by_team
 
