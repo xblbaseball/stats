@@ -26,7 +26,7 @@ class SafeNum(numbers.Number):
     def __int__(self):
         if self._x is None:
             return int("nan")
-
+        
         return int(self._x)
 
     def __float__(self):
@@ -61,6 +61,12 @@ class SafeNum(numbers.Number):
         """+"""
         if self._x is None or other is None:
             return SafeNum(None)
+        
+        if isinstance(other, SafeNum):
+            if other._x == None:
+                return SafeNum(None)
+            
+            return SafeNum(self._x + other._x)
 
         return SafeNum(self._x + other)
 
@@ -69,7 +75,7 @@ class SafeNum(numbers.Number):
         if other is None:
             return SafeNum(None)
 
-        self._x = self._x + other
+        self = self + other
         return self
 
     def __radd__(self, other):
