@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 
 from stats import gsheets
-from stats.games import agg_team_stats, annotate_game_results
+from stats.games import agg_team_stats, annotate_computed_stats, annotate_game_results
 
 
 class StatsAggNamespace(argparse.Namespace):
@@ -53,8 +53,12 @@ def main(args: type[StatsAggNamespace]):
     )
 
     annotate_game_results(aa_box_scores_df, "AA", False)
-    stats_by_team = agg_team_stats(aa_box_scores_df)
-    print(stats_by_team)
+    team_stats_df = agg_team_stats(aa_box_scores_df)
+    league_era = (
+        9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
+    )
+    annotate_computed_stats(team_stats_df, league_era=league_era)
+    print(team_stats_df)
 
 
 if __name__ == "__main__":
