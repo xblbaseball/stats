@@ -22,7 +22,6 @@ def as_df(path_to_json: Path, str_cols=[]) -> pd.DataFrame:
     numeric_cols = [col for col in columns if col not in str_cols]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors='raise')
-
     if str_cols:
         df[str_cols] = df[str_cols].astype("string")
 

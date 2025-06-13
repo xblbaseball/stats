@@ -1,8 +1,11 @@
 import argparse
+import numpy as np
 from pathlib import Path
 from typing import List
 
 from stats import gsheets
+from stats.games import agg_team_stats, annotate_game_results
+
 
 class StatsAggNamespace(argparse.Namespace):
     season: int
@@ -45,11 +48,14 @@ def arg_parser():
 
 
 def main(args: type[StatsAggNamespace]):
-    # aa_hitting = args.g_sheets_dir / "AA__Hitting.json"
-    # df_aa_hitting = gsheets.as_df(aa_hitting)
+    aa_box_scores_df = gsheets.as_df(
+        args.g_sheets_dir / "AA__Box%20Scores.json", str_cols=["away", "home", "week"]
+    )
 
-    df_aa_box_scores = gsheets.as_df(args.g_sheets_dir / "AA__Box%20Scores.json", str_cols=["away", "home", "week"])
-    print(df_aa_box_scores.dtypes)
+    annotate_game_results(aa_box_scores_df, "AA", False)
+    stats_by_team = agg_team_stats(aa_box_scores_df)
+    print(stats_by_team)
+
 
 if __name__ == "__main__":
     parser = arg_parser()
