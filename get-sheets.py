@@ -91,7 +91,7 @@ def collect_all_time_stats(json_dir: Path, g_sheets_api_key: str):
             print(f" saved {sheet} {tab}")
 
 
-def main(args: SheetsNamespace):
+def main(args: type[SheetsNamespace]):
     if args.g_sheets_api_key is None or args.g_sheets_api_key == "":
         raise Exception("Missing Google Drive API key")
 
@@ -104,5 +104,5 @@ def main(args: SheetsNamespace):
 
 if __name__ == "__main__":
     parser = arg_parser()
-    args: SheetsNamespace = parser.parse_args()
+    args = parser.parse_args(namespace=SheetsNamespace)
     main(args)
