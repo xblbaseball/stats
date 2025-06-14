@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 
 
-def as_df(path_to_json: Path, str_cols=[]) -> pd.DataFrame:
+def json_as_df(path_to_json: Path, str_cols=[]) -> pd.DataFrame:
     """Return a DataFrame with cleaned up column names. Cases are lowered, spaces are turned into `_`, and periods are removed. E.g. `A. AB` turns into `a_ab`
 
     Args:
