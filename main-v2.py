@@ -5,6 +5,8 @@ from typing import List
 
 from stats import gsheets
 from stats.games import agg_team_stats, annotate_computed_stats, annotate_game_results
+from stats.players import aggregate_players
+from stats.teams import clean_standings
 
 
 class StatsAggNamespace(argparse.Namespace):
@@ -52,13 +54,51 @@ def main(args: type[StatsAggNamespace]):
         args.g_sheets_dir / "AA__Box%20Scores.json", str_cols=["away", "home", "week"]
     )
 
-    annotate_game_results(aa_box_scores_df, "AA", False)
+    annotate_game_results(aa_box_scores_df, False)
     team_stats_df = agg_team_stats(aa_box_scores_df)
     league_era = (
         9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
     )
-    annotate_computed_stats(team_stats_df, league_era=league_era)
-    print(team_stats_df)
+    annotate_computed_stats(team_stats_df, league="AA", league_era=league_era)
+    # print(team_stats_df)
+
+    aa_standings_df = gsheets.as_df(
+        args.g_sheets_dir / "AA__Standings.json", str_cols=["elo", "gb", "team_name"]
+    )
+    clean_standings(aa_standings_df)
+
+    xbl_abbrev_df = gsheets.as_df(
+        args.g_sheets_dir / "CAREER_STATS__XBL%20Team%20Abbreviations.json",
+        str_cols=[
+            "xbl_teams",
+            "xbl_abbreviations",
+            "player",
+            "concatenate",
+            "seasons_played",
+        ],
+    )
+    aaa_abbrev_df = gsheets.as_df(
+        args.g_sheets_dir / "CAREER_STATS__AAA%20Team%20Abbreviations.json",
+        str_cols=[
+            "aaa_teams",
+            "aaa_abbreviations",
+            "player",
+            "concatenate",
+            "seasons_played",
+        ],
+    )
+    aa_abbrev_df = gsheets.as_df(
+        args.g_sheets_dir / "CAREER_STATS__AA%20Team%20Abbreviations.json",
+        str_cols=[
+            "aa_teams",
+            "aa_abbreviations",
+            "player",
+            "concatenate",
+            "seasons_played",
+        ],
+    )
+
+    aggregate_players(xbl_abbrev_df, aaa_abbrev_df, aa_abbrev_df)
 
 
 if __name__ == "__main__":

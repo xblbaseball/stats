@@ -1,14 +1,15 @@
+"""logic for aggregating stats across games"""
+
 import numpy as np
 import pandas as pd
 from typing import List
 
-from .models import GameResults, League
+from .models import League
 
 
-def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = False):
-    """Add `league`, wins, losses, run_rule, etc columns to game results. Used as preparation for aggregating stats accross games"""
+def annotate_game_results(games_df: pd.DataFrame, playoffs: bool = False):
+    """Add wins, losses, run_rule, etc columns to game results. Used as preparation for aggregating stats accross games"""
 
-    games_df["league"] = league
     games_df["game"] = 1
 
     games_df["a_win"] = np.where(
@@ -43,8 +44,6 @@ def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = 
     games_df["h_run_rule_loss"] = np.where(
         (games_df.ip <= 8.0) & (games_df.a_score > games_df.h_score), 1, 0
     )
-
-    games_df["league"] = games_df["league"].astype("string")
 
     if playoffs:
         games_df.week = pd.NA
@@ -109,12 +108,18 @@ def agg_team_stats(all_games_df: pd.DataFrame) -> pd.DataFrame:
     return team_stats_df
 
 
-def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
+def annotate_computed_stats(
+    team_stats_df: pd.DataFrame, league: League, league_era: float
+):
     """Use raw aggregated stats to compute all the stats that depend on more than one column"""
 
+    team_stats_df["league"] = league
+    team_stats_df.league = team_stats_df.league.astype("string")
+
+    team_stats_df.rename(columns={"r": "rs", "oppr": "ra"}, inplace=True)
+
     # hitting
-    team_stats_df["rs"] = team_stats_df.r
-    team_stats_df["rs9"] = (team_stats_df.r / team_stats_df.innings_hitting) * 9
+    team_stats_df["rs9"] = (team_stats_df.rs / team_stats_df.innings_hitting) * 9
     team_stats_df["ba"] = team_stats_df.h / team_stats_df.ab
     team_stats_df["ab9"] = (team_stats_df.ab / team_stats_df.innings_hitting) * 9
     team_stats_df["h9"] = (team_stats_df.h / team_stats_df.innings_hitting) * 9
@@ -125,15 +130,15 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     team_stats_df["obp"] = (
         (team_stats_df.h + team_stats_df.bb) / (team_stats_df.ab + team_stats_df.bb) * 9
     )
-    team_stats_df["rc"] = team_stats_df.h / team_stats_df.r
+    team_stats_df["rc"] = team_stats_df.h / team_stats_df.rs
     team_stats_df["babip"] = (team_stats_df.h - team_stats_df.hr) / (
         team_stats_df.ab - team_stats_df.so - team_stats_df.hr
     )
+    # keep k and so so we don't break any current ticker configs
     team_stats_df["k"] = team_stats_df["so"]
 
     # pitching
-    team_stats_df["ra"] = team_stats_df.oppr
-    team_stats_df["ra9"] = (team_stats_df.oppr / team_stats_df.innings_pitching) * 9
+    team_stats_df["ra9"] = (team_stats_df.ra / team_stats_df.innings_pitching) * 9
     team_stats_df["oppba"] = team_stats_df.opph / team_stats_df.oppab
     team_stats_df["oppab9"] = (team_stats_df.oppab / team_stats_df.innings_pitching) * 9
     team_stats_df["opph9"] = (team_stats_df.opph / team_stats_df.innings_pitching) * 9
@@ -162,13 +167,4 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     ) / 2
     team_stats_df["innings_game"] = (
         team_stats_df.innings_played / team_stats_df.games_played
-    )
-
-    # these were renamed
-    team_stats_df.drop(
-        columns=[
-            "r",
-            "oppr",
-        ],
-        inplace=True,
     )
