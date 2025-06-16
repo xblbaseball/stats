@@ -39,6 +39,6 @@ jobs:
         env:
           G_SHEETS_API_KEY: ${{ secrets.G_SHEETS_API_KEY }}
       - name: structure and aggregate stats
-        run: python main.py --season ${{ vars.SEASON }}
+        run: python main-v2.py --season ${{ vars.SEASON }}
       - name: update json schemas
         run: python models.py

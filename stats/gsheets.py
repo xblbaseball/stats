@@ -1,5 +1,6 @@
 import json
 from typing import Any, List
+import numpy as np
 import pandas as pd
 from pathlib import Path
 
@@ -32,6 +33,10 @@ def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFr
     ]
     df.columns = columns
 
+    # sometimes LO leaves columns blank. get rid of them
+    df.replace({"": np.nan}, inplace=True)
+    df.dropna(axis=1, how="all", inplace=True)
+
     # fix types
     numeric_cols = [col for col in columns if col not in str_cols]
     for col in numeric_cols:
@@ -42,7 +47,14 @@ def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFr
     return df
 
 
-def find_games_with_bad_data(df: pd.DataFrame):
+def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Return any games where there are NaNs recorded. These would be due to either DCs or bad inputs
+
+    Args:
+        df DataFrame of games pre-processing
+    Returns:
+        DataFrame
+    """
     all_nan_rows = df[df.isna().any(axis=1)]
     # increment the index by 2 to match the rows in the spreadsheet (row 1 is the header, games start on row 2)
     all_nan_rows.index += 2
