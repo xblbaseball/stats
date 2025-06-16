@@ -2,7 +2,7 @@ import pandas as pd
 
 
 def clean_standings(standings_df: pd.DataFrame, league: str):
-    """Clean up standings data"""
+    """Update the DataFrame in place. Clean up standings data"""
     columns_to_rename = {
         "#": "rank",
         "1run": "one_run",

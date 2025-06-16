@@ -156,3 +156,5 @@ class TestGames(unittest.TestCase):
             3 / 30,
             msg="alligators had 3 hits and 30 known ABs (one game is missing ABs)",
         )
+
+    # TODO check that more stats are accurate

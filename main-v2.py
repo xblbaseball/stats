@@ -60,7 +60,6 @@ def main(args: type[StatsAggNamespace]):
         )
 
         dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
-
         if len(dcs_and_bad_data) > 0:
             print(f"These {league} games are missing data:")
             print(dcs_and_bad_data)
@@ -70,7 +69,7 @@ def main(args: type[StatsAggNamespace]):
         league_era = (
             9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
         )
-        annotate_computed_stats(team_stats_df, league="AA", league_era=league_era)
+        annotate_computed_stats(team_stats_df, league=league, league_era=league_era)
 
         standings_df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Standings.json",
@@ -113,6 +112,7 @@ def main(args: type[StatsAggNamespace]):
 
     all_players = aggregate_players(xbl_abbrev_df, aaa_abbrev_df, aa_abbrev_df)
     active_players = get_active_players(all_players, args.season)
+    # TODO write these somewhere
 
 
 if __name__ == "__main__":

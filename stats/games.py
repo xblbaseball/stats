@@ -8,7 +8,7 @@ from .models import League
 
 
 def annotate_game_results(games_df: pd.DataFrame, playoffs: bool = False):
-    """Add wins, losses, run_rule, etc columns to game results. Used as preparation for aggregating stats accross games"""
+    """Update the DataFrame in place. Add wins, losses, run_rule, etc columns to game results. Used as preparation for aggregating stats accross games"""
 
     games_df["game"] = 1
 
@@ -111,7 +111,7 @@ def agg_team_stats(all_games_df: pd.DataFrame) -> pd.DataFrame:
 def annotate_computed_stats(
     team_stats_df: pd.DataFrame, league: League, league_era: float
 ):
-    """Use raw aggregated stats to compute all the stats that depend on more than one column"""
+    """Update the DataFrame in place. Use raw aggregated stats to compute all the stats that depend on more than one column"""
 
     team_stats_df["league"] = league
     team_stats_df.league = team_stats_df.league.astype("string")
