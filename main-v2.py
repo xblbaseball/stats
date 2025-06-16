@@ -50,21 +50,35 @@ def arg_parser():
 
 
 def main(args: type[StatsAggNamespace]):
-    aa_box_scores_df = gsheets.json_as_df(
-        args.g_sheets_dir / "AA__Box%20Scores.json", str_cols=["away", "home", "week"]
-    )
+    leagues = ["XBL", "AAA", "AA"]
 
-    annotate_game_results(aa_box_scores_df, False)
-    team_stats_df = agg_team_stats(aa_box_scores_df)
-    league_era = (
-        9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
-    )
-    annotate_computed_stats(team_stats_df, league="AA", league_era=league_era)
+    # regular season
+    for league in leagues:
+        df = gsheets.json_as_df(
+            args.g_sheets_dir / f"{league}__Box%20Scores.json",
+            str_cols=["away", "home", "week"],
+        )
 
-    aa_standings_df = gsheets.json_as_df(
-        args.g_sheets_dir / "AA__Standings.json", str_cols=["elo", "gb", "team_name"]
-    )
-    clean_standings(aa_standings_df)
+        dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
+
+        if len(dcs_and_bad_data) > 0:
+            print(f"These {league} games are missing data:")
+            print(dcs_and_bad_data)
+
+        annotate_game_results(df, False)
+        team_stats_df = agg_team_stats(df)
+        league_era = (
+            9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
+        )
+        annotate_computed_stats(team_stats_df, league="AA", league_era=league_era)
+
+        standings_df = gsheets.json_as_df(
+            args.g_sheets_dir / f"{league}__Standings.json",
+            str_cols=["elo", "gb", "team_name"],
+        )
+        clean_standings(standings_df, league)
+
+        # TODO write these somewhere!
 
     xbl_abbrev_df = gsheets.json_as_df(
         args.g_sheets_dir / "CAREER_STATS__XBL%20Team%20Abbreviations.json",

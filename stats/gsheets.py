@@ -40,3 +40,11 @@ def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFr
         df[str_cols] = df[str_cols].astype("string")
 
     return df
+
+
+def find_games_with_bad_data(df: pd.DataFrame):
+    all_nan_rows = df[df.isna().any(axis=1)]
+    # increment the index by 2 to match the rows in the spreadsheet (row 1 is the header, games start on row 2)
+    all_nan_rows.index += 2
+
+    return all_nan_rows

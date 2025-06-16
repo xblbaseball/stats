@@ -5,7 +5,7 @@ import unittest
 from stats import gsheets
 from stats.games import agg_team_stats, annotate_game_results, annotate_computed_stats
 
-box_score_columns = [
+BOX_SCORE_COLUMNS = [
     "week",
     "away",
     "a_score",
@@ -72,7 +72,7 @@ class TestGames(unittest.TestCase):
                     12,  # h_so
                 ],
             ],
-            columns=box_score_columns,
+            columns=BOX_SCORE_COLUMNS,
         )
 
         annotate_game_results(box_scores_df, False)
@@ -90,7 +90,7 @@ class TestGames(unittest.TestCase):
     def test_garbage_in(self):
         box_scores_df = gsheets.values_to_df(
             [
-                box_score_columns,
+                BOX_SCORE_COLUMNS,
                 # garbage
                 [
                     1,  # week
