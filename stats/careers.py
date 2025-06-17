@@ -6,8 +6,8 @@ def career_cols_to_box_scores_cols(df: pd.DataFrame):
 
     Args:
         df DataFrame from Head to Head data"""
-    df.replace(
-        {
+    df.rename(
+        columns={
             "away_player": "away",
             "away_score": "a_score",
             "home_player": "home",

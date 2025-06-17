@@ -27,22 +27,22 @@ def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFr
     Returns:
         pd.DataFrame
     """
-    df = pd.DataFrame(values[1:])
-    columns = [
-        str(col).lower().strip().replace(" ", "_").replace(".", "") for col in values[0]
-    ]
-    df.columns = columns
-
-    # sometimes LO leaves columns blank. get rid of them
-    df.replace({"": np.nan}, inplace=True)
-    df.dropna(axis=1, how="all", inplace=True)
+    df = pd.DataFrame(values[1:], columns=values[0])
 
     # fix types
-    numeric_cols = [col for col in columns if col not in str_cols]
+    numeric_cols = [col for col in values[0] if col not in str_cols]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     if str_cols:
         df[str_cols] = df[str_cols].astype("string")
+
+    # clean up the column names
+    clean_col = lambda col: str(col).lower().strip().replace(" ", "_").replace(".", "")
+    df.rename(columns={col: clean_col(col) for col in values[0]}, inplace=True)
+
+    # sometimes LO leaves columns blank. get rid of them
+    df.replace({"": np.nan}, inplace=True)
+    df.dropna(axis=1, how="all", inplace=True)
 
     return df
 

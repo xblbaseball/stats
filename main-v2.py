@@ -57,7 +57,28 @@ def arg_parser():
     return parser
 
 
-def build_career_stats(args: StatsAggNamespace) -> CareerStats:
+def prep_career_stats(args: type[StatsAggNamespace], league: str):
+    h2h_df = gsheets.json_as_df(
+        args.g_sheets_dir / f"CAREER_STATS__{league}%20Head%20to%20Head.json",
+        str_cols=[
+            "Week",
+            "Away Player",
+            "Away Result",
+            "Home Player",
+            "Home Result",
+        ],
+    )
+
+    h2h_df["league"] = league
+
+    # make career data's columns match box scores so we can use the same methods
+    career_cols_to_box_scores_cols(h2h_df)
+    annotate_game_results(h2h_df, league, playoffs=False)
+
+    return h2h_df
+
+
+def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
     """Get career stats for all players
 
     Args:
@@ -83,11 +104,11 @@ def build_career_stats(args: StatsAggNamespace) -> CareerStats:
         gsheets.json_as_df(
             args.g_sheets_dir / f"CAREER_STATS__{league}%20Team%20Abbreviations.json",
             str_cols=[
-                f"{league.lower()}_teams",
-                f"{league.lower()}_abbreviations",
-                "player",
-                "concatenate",
-                "seasons_played",
+                f"{league} Teams",
+                f"{league} Abbreviations",
+                "Player",
+                "Concatenate",
+                "Seasons Played",
             ],
         )
         for league in LEAGUES
@@ -102,29 +123,12 @@ def build_career_stats(args: StatsAggNamespace) -> CareerStats:
 
     # get regular season stats for all players across all leagues and all seasons and all head to heads
     [xbl_h2h_df, aaa_h2h_df, aa_h2h_df] = [
-        gsheets.json_as_df(
-            args.g_sheets_dir / f"CAREER_STATS__{league}%20Head%20to%20Head.json",
-            str_cols=[
-                "Week",
-                "Away Player",
-                "Away Result",
-                "Home Player",
-                "Home Result",
-            ],
-        )
-        for league in LEAGUES
+        prep_career_stats(args, league) for league in LEAGUES
     ]
 
-    xbl_h2h_df["league"] = "XBL"
-    aaa_h2h_df["league"] = "AAA"
-    aa_h2h_df["league"] = "AA"
-
     all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
-    # make career data's columns match box scores so we can use the same methods
-    career_cols_to_box_scores_cols(all_games_ever_df)
-
-    annotate_game_results(all_games_ever_df, playoffs=False)
     all_games_by_player_df = agg_team_stats(all_games_ever_df, index="player")
+    print(all_games_by_player_df)
 
     # TODO need league ERAs here
 
@@ -179,7 +183,7 @@ def main(args: type[StatsAggNamespace]):
     for league in LEAGUES:
         df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Box%20Scores.json",
-            str_cols=["away", "home", "week"],
+            str_cols=["Away", "Home", "Week"],
         )
 
         dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
@@ -192,18 +196,17 @@ def main(args: type[StatsAggNamespace]):
         league_era = (
             9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
         )
-        annotate_computed_stats(team_stats_df, league=league, league_era=league_era)
-        print(team_stats_df)
+        annotate_computed_stats(team_stats_df, league_era=league_era)
 
         standings_df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Standings.json",
-            str_cols=["elo", "gb", "team_name"],
+            str_cols=["ELO", "GB", "Team Name"],
         )
         clean_standings(standings_df, league)
 
         # TODO write these somewhere!
 
-    # career_data = build_career_stats(args.g_sheets_dir, args.season)
+    career_data = build_career_stats(args)
 
     # career_json = args.save_dir / "careers.json"
     # print(f"Writing {career_json}...")

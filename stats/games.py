@@ -57,7 +57,6 @@ def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
     """Aggregate stats by team across all games in the input dataframe. Assumes games have been annotated with `annotate_game_results`"""
 
     home_stats_df = all_games_df.groupby("home").agg(
-        # TODO test
         league=("league", "first"),
         wins=("h_win", "sum"),
         losses=("h_loss", "sum"),
@@ -83,7 +82,6 @@ def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
     )
 
     away_stats_df = all_games_df.groupby("away").agg(
-        # TODO test
         league=("league", "first"),
         wins=("a_win", "sum"),
         losses=("a_loss", "sum"),
@@ -111,8 +109,10 @@ def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
     team_stats_df = away_stats_df + home_stats_df
 
     # fix the fact that adding the DFs also added league names to each other
-    team_stats_df.league = team_stats_df.league.str.slice(
-        0, team_stats_df.league.len() // 2
+    team_stats_df.league = (
+        team_stats_df.league.replace({"XBLXBL": "XBL"})
+        .replace({"AAAAAA": "AAA"})
+        .replace({"AAAA": "AA"})
     )
 
     team_stats_df.rename_axis(index, inplace=True)
@@ -120,13 +120,8 @@ def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
     return team_stats_df
 
 
-def annotate_computed_stats(
-    team_stats_df: pd.DataFrame, league: League, league_era: float
-):
+def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     """Update the DataFrame in place. Use raw aggregated stats to compute all the stats that depend on more than one column"""
-
-    # team_stats_df["league"] = league
-    # team_stats_df.league = team_stats_df.league.astype("string")
 
     team_stats_df.rename(columns={"r": "rs", "oppr": "ra"}, inplace=True)
 
