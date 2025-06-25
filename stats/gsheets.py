@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from stats.games import annotate_game_results, normalize_games
+from stats.models import TeamSeason
+
 
 def json_as_df(path_to_json: Path, str_cols: List[str] = []) -> pd.DataFrame:
     """Return a DataFrame with cleaned up column names. Cases are lowered, spaces are turned into `_`, and periods are removed. E.g. `A. AB` turns into `a_ab`
@@ -60,3 +63,57 @@ def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
     all_nan_rows.index += 2
 
     return all_nan_rows
+
+
+def career_cols_to_season_cols(df: pd.DataFrame):
+    """Update the CAREER_STATS__* and PLAYOFF_STATS__* DataFrames in place to match the columns we get in the current season's box scores.
+
+    Args:
+        df DataFrame from Head to Head data"""
+    df.rename(
+        columns={
+            "away_player": "away",
+            "away_score": "a_score",
+            "home_player": "home",
+            "home_score": "h_score",
+        },
+        inplace=True,
+    )
+    df.drop(columns=["away_result", "home_result"], inplace=True)
+
+
+def normalize_box_scores_spreadsheet(
+    df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
+):
+    annotate_game_results(df, league, playoffs=False)
+    teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
+    df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
+    df["home_player"] = df["home"].apply(lambda home: teams_to_players[home])
+    return normalize_games(df)
+
+
+def normalize_playoffs_spreadsheet(
+    df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
+):
+    annotate_game_results(df, league, playoffs=True)
+    teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
+    df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
+    df["home_player"] = df["home"].apply(lambda home: teams_to_players[home])
+    return normalize_games(df)
+
+
+def normalize_head_to_head_spreadsheet(
+    df: pd.DataFrame,
+    all_players: dict[str, List[TeamSeason]],
+    playoffs=False,
+):
+    career_cols_to_season_cols(df)
+    annotate_game_results(df, league, playoffs=playoffs)
+    # players_to_teams = {ts["player"]: ts["team_name"] for ts in active_players[league]}
+    # df["away"] = df["away_player"].apply(lambda away_team: players_to_teams[away_team])
+    # df["home"] = df["home_player"].apply(lambda home_team: players_to_teams[home_team])
+
+    # extra columns we don't care about
+    df.drop(columns=["away_result", "home_result"], inplace=True)
+
+    return normalize_games(df)

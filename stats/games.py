@@ -12,8 +12,6 @@ def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = 
     games_df["league"] = league
     games_df.league = games_df.league.astype("string")
 
-    games_df["game"] = 1
-
     games_df["a_win"] = np.where(
         games_df.a_score > games_df.h_score,
         1,
@@ -156,8 +154,8 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     team_stats_df["oppk9"] = (team_stats_df.oppk / team_stats_df.innings_pitching) * 9
     team_stats_df["oppbb9"] = (team_stats_df.oppbb / team_stats_df.innings_pitching) * 9
     team_stats_df["whip"] = (
-        team_stats_df.opph + team_stats_df.oppbb / team_stats_df.innings_pitching
-    )
+        team_stats_df.opph + team_stats_df.oppbb
+    ) / team_stats_df.innings_pitching
     team_stats_df["lob"] = (
         team_stats_df.opph + team_stats_df.oppbb - team_stats_df.ra
     ) / (team_stats_df.opph + team_stats_df.oppbb - 1.4 * team_stats_df.opphr)
@@ -179,6 +177,14 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
 
 
 def normalize_games(games_df: pd.DataFrame):
+    """Return a DF that has been normalized to match the standard columns described in docs/data-structures.md. There should be two rows for every game, one from away's perspective, another from home's. It expects that the games have been run through `annotate_game_results()` to get basic info, and that both player and team names (i.e., `away`, `away_player`, `home`, and `home_player` columns) are available.
+
+    Args:
+        df DataFrame
+
+    Returns
+        DataFrame that matches docs/data-structures.md
+    """
     # we want each game from the home and away perspective so we can index by team
     away_games_df = games_df.copy()
 
@@ -187,14 +193,17 @@ def normalize_games(games_df: pd.DataFrame):
     # rename columns for away teams
     away_games_df.rename(
         columns={
+            "away_player": "player",
+            "home_player": "opponent",
             "away": "team",
-            "home": "opponent",
+            "home": "opponent_team",
             "a_win": "win",
             "a_loss": "loss",
             "a_run_rule_win": "run_rule_win",
             "a_run_rule_loss": "run_rule_loss",
             "a_score": "rs",
             "h_score": "ra",
+            "ip": "innings",
             "a_e": "e",
             "a_ab": "ab",
             "a_h": "h",
@@ -212,19 +221,11 @@ def normalize_games(games_df: pd.DataFrame):
         inplace=True,
     )
 
-    away_games_df.drop(
-        columns=[
-            # redundant
-            "a_r",
-            "h_r",
-            # not relevant for the away team
-            "h_e",
-            "h_loss",
-            "h_run_rule_win",
-            "h_run_rule_loss",
-            "h_win",
-        ],
-        inplace=True,
+    away_games_df["innings_hitting"] = away_games_df["innings"].apply(
+        lambda ip: np.ceil(ip)
+    )
+    away_games_df["innings_pitching"] = away_games_df["innings"].apply(
+        lambda ip: np.floor(ip)
     )
 
     # follow the same renaming and dropping for home teams
@@ -233,14 +234,17 @@ def normalize_games(games_df: pd.DataFrame):
     # rename columns for home teams
     home_games_df.rename(
         columns={
+            "home_player": "player",
+            "away_player": "opponent",
             "home": "team",
-            "away": "opponent",
+            "away": "opponent_team",
             "h_win": "win",
             "h_loss": "loss",
             "h_run_rule_win": "run_rule_win",
             "h_run_rule_loss": "run_rule_loss",
             "h_score": "rs",
             "a_score": "ra",
+            "ip": "innings",
             "h_e": "e",
             "h_ab": "ab",
             "h_h": "h",
@@ -258,12 +262,34 @@ def normalize_games(games_df: pd.DataFrame):
         inplace=True,
     )
 
-    home_games_df.drop(
+    home_games_df["innings_hitting"] = home_games_df["innings"].apply(
+        lambda ip: np.floor(ip)
+    )
+    home_games_df["innings_pitching"] = home_games_df["innings"].apply(
+        lambda ip: np.ceil(ip)
+    )
+
+    # get rid of extraneous columns
+    away_games_df.drop(
         columns=[
             # redundant
             "a_r",
             "h_r",
             # not relevant for the away team
+            "h_e",
+            "h_loss",
+            "h_run_rule_win",
+            "h_run_rule_loss",
+            "h_win",
+        ],
+        inplace=True,
+    )
+    home_games_df.drop(
+        columns=[
+            # redundant
+            "a_r",
+            "h_r",
+            # not relevant for the home team
             "a_e",
             "a_loss",
             "a_run_rule_win",

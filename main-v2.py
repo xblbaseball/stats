@@ -62,8 +62,35 @@ def arg_parser():
     return parser
 
 
+# kwargs to use when calling .groupby( ... ).agg(**kwargs) to aggregate stats
+AGG_NORMALIZED_STATS_KWARGS = {
+    "league": ("league", "first"),
+    "games_played": ("team", "count"),  # FYI column doesn't matter
+    "wins": ("win", "sum"),
+    "losses": ("loss", "sum"),
+    "wins_by_run_rule": ("run_rule_win", "sum"),
+    "losses_by_run_rule": ("run_rule_loss", "sum"),
+    "ab": ("ab", "sum"),
+    "r": ("rs", "sum"),
+    "h": ("h", "sum"),
+    "hr": ("hr", "sum"),
+    "rbi": ("rbi", "sum"),
+    "bb": ("bb", "sum"),
+    "so": ("so", "sum"),
+    "oppab": ("oppab", "sum"),
+    "oppr": ("ra", "sum"),
+    "opph": ("opph", "sum"),
+    "opphr": ("opphr", "sum"),
+    "opprbi": ("opprbi", "sum"),
+    "oppbb": ("oppbb", "sum"),
+    "oppso": ("oppso", "sum"),
+    "innings_hitting": ("innings_hitting", "sum"),
+    "innings_pitching": ("innings_pitching", "sum"),
+}
+
+
 def prep_career_stats(args: type[StatsAggNamespace], league: str):
-    h2h_df = gsheets.json_as_df(
+    df = gsheets.json_as_df(
         args.g_sheets_dir / f"CAREER_STATS__{league}%20Head%20to%20Head.json",
         str_cols=[
             "Week",
@@ -74,19 +101,14 @@ def prep_career_stats(args: type[StatsAggNamespace], league: str):
         ],
     )
 
-    h2h_df["league"] = league
+    df["league"] = league
 
-    # TODO try to multiindex on player, league, season?
-
-    # make career data's columns match box scores so we can use the same methods
-    career_cols_to_box_scores_cols(h2h_df)
-    annotate_game_results(h2h_df, league, playoffs=False)
-    normalized_games_df = normalize_games(h2h_df)
-
-    return normalized_games_df
+    return df
 
 
-def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
+def build_career_stats(
+    args: type[StatsAggNamespace], all_players: dict[str, Player]
+) -> CareerStats:
     """Get career stats for all players
 
     Args:
@@ -97,38 +119,6 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
 
     print(f"Running career stats...")
 
-    # what we'll eventually return
-    data: CareerStats = {
-        "all_players": {},
-        "active_players": {},
-        "regular_season": {},
-        "regular_season_head_to_head": [],
-        "playoffs": {},
-        "playoffs_head_to_head": [],
-    }
-
-    # a DF that maps (human) players with teams they've played as
-    team_abbrev_df = [
-        gsheets.json_as_df(
-            args.g_sheets_dir / f"CAREER_STATS__{league}%20Team%20Abbreviations.json",
-            str_cols=[
-                f"{league} Teams",
-                f"{league} Abbreviations",
-                "Player",
-                "Concatenate",
-                "Seasons Played",
-            ],
-        )
-        for league in LEAGUES
-    ]
-
-    # get who has played as what team, and who is currently playing this season
-    all_players = aggregate_players(*team_abbrev_df)
-    active_players = get_active_players(all_players, args.season)
-
-    data["all_players"] = all_players
-    data["active_players"] = active_players
-
     # get regular season stats for all players across all leagues and all seasons and all head to heads
     [xbl_h2h_df, aaa_h2h_df, aa_h2h_df] = [
         prep_career_stats(args, league) for league in LEAGUES
@@ -136,10 +126,9 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
 
     all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
 
-    # cols = all_games_ever_df.columns.to_list()
-    # for col in cols:
-    #     print(f"- `{col}`")
-    print(all_games_ever_df.dtypes)
+    gsheets.normalize_head_to_head_spreadsheet(
+        all_games_ever_df, all_players, playoffs=False
+    )
 
     # TODO filter on league, season, player, then agg stats
 
@@ -226,6 +215,25 @@ def clean_box_scores(games_df: pd.DataFrame, players_df: pd.DataFrame):
 
 
 def main(args: type[StatsAggNamespace]):
+    # a DF that maps (human) players with teams they've played as
+    team_abbrev_df = [
+        gsheets.json_as_df(
+            args.g_sheets_dir / f"CAREER_STATS__{league}%20Team%20Abbreviations.json",
+            str_cols=[
+                f"{league} Teams",
+                f"{league} Abbreviations",
+                "Player",
+                "Concatenate",
+                "Seasons Played",
+            ],
+        )
+        for league in LEAGUES
+    ]
+
+    # get who has played as what team, and who is currently playing this season
+    all_players = aggregate_players(*team_abbrev_df)
+    active_players = get_active_players(all_players, args.season)
+
     # regular season
     for league in LEAGUES:
         df = gsheets.json_as_df(
@@ -237,27 +245,32 @@ def main(args: type[StatsAggNamespace]):
 
         dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
         if len(dcs_and_bad_data) > 0:
+            # TODO write public/missing-games.html
             print(f"These {league} games are missing data:")
             print(dcs_and_bad_data.to_dict(orient="records"))
 
-        # TODO annotate player names / swap team names with player names
+        normalized_df = gsheets.normalize_box_scores_spreadsheet(
+            df, active_players, league
+        )
 
-        annotate_game_results(df, league, False)
-        team_stats_df = agg_team_stats(df)
+        team_stats_df = normalized_df.groupby("team").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
+
         league_era = (
             9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
         )
         annotate_computed_stats(team_stats_df, league_era=league_era)
 
-        standings_df = gsheets.json_as_df(
-            args.g_sheets_dir / f"{league}__Standings.json",
-            str_cols=["ELO", "GB", "Team Name"],
-        )
-        clean_standings(standings_df, league)
+        print(team_stats_df)
+
+        # standings_df = gsheets.json_as_df(
+        #     args.g_sheets_dir / f"{league}__Standings.json",
+        #     str_cols=["ELO", "GB", "Team Name"],
+        # )
+        # clean_standings(standings_df, league)
 
         # TODO write these somewhere!
 
-    career_data = build_career_stats(args)
+    career_data = build_career_stats(args, all_players)
 
     # career_json = args.save_dir / "careers.json"
     # print(f"Writing {career_json}...")

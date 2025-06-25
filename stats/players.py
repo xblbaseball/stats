@@ -55,7 +55,14 @@ def aggregate_players(
 def get_active_players(
     players: dict[str, Player], season: int
 ) -> dict[str, List[TeamSeason]]:
-    """get the players (usernames) who are playing this season. assumes a player is only in 1 league per season"""
+    """get the players (usernames) who are playing this season. assumes a player is only in 1 league per season
+
+    Args:
+        players {player name: Player}
+        season int
+    Returns:
+        {league: [TeamSeason]}
+    """
 
     active_players: dict[str, List[TeamSeason]] = {"XBL": [], "AAA": [], "AA": []}
 
