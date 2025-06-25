@@ -15,3 +15,4 @@ def career_cols_to_box_scores_cols(df: pd.DataFrame):
         },
         inplace=True,
     )
+    df.drop(columns=["away_result", "home_result"], inplace=True)

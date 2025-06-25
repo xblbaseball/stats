@@ -9,7 +9,12 @@ from typing import List
 
 from stats import gsheets
 from stats.careers import career_cols_to_box_scores_cols
-from stats.games import agg_team_stats, annotate_computed_stats, annotate_game_results
+from stats.games import (
+    agg_team_stats,
+    annotate_computed_stats,
+    annotate_game_results,
+    normalize_games,
+)
 from stats.models import *
 from stats.players import aggregate_players, get_active_players
 from stats.teams import clean_standings
@@ -76,8 +81,9 @@ def prep_career_stats(args: type[StatsAggNamespace], league: str):
     # make career data's columns match box scores so we can use the same methods
     career_cols_to_box_scores_cols(h2h_df)
     annotate_game_results(h2h_df, league, playoffs=False)
+    normalized_games_df = normalize_games(h2h_df)
 
-    return h2h_df
+    return normalized_games_df
 
 
 def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
@@ -130,6 +136,11 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
 
     all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
 
+    # cols = all_games_ever_df.columns.to_list()
+    # for col in cols:
+    #     print(f"- `{col}`")
+    print(all_games_ever_df.dtypes)
+
     # TODO filter on league, season, player, then agg stats
 
     # by_season_df = all_games_ever_df[
@@ -137,8 +148,21 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
     # ]
     # print(by_season_df)
 
-    by_season_df = all_games_ever_df.groupby("season")
-    by_league_df = all_games_ever_df.groupby("league")
+    # TODO:
+    # - all-time
+    # - per regular season
+    # - per league RS
+    # - per opponent
+    # - per playoffs
+    # - per league playoffs
+
+    groupby_season = all_games_ever_df.groupby(["season", "league", "team"])
+    ba_per_season_league_team = groupby_season.agg(ab=("ab", "sum"), hits=("h", "sum"))
+
+    ba_per_season_league = ba_per_season_league_team.groupby(["season", "league"]).agg(
+        ab=("ab", "sum"), hits=("hits", "sum")
+    )
+    print(ba_per_season_league["hits"] / ba_per_season_league["ab"])
 
     # all_games_by_player_df = agg_team_stats(all_games_ever_df, index="player")
     # print(all_games_by_player_df)
@@ -197,6 +221,10 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
     return data
 
 
+def clean_box_scores(games_df: pd.DataFrame, players_df: pd.DataFrame):
+    pass
+
+
 def main(args: type[StatsAggNamespace]):
     # regular season
     for league in LEAGUES:
@@ -211,6 +239,8 @@ def main(args: type[StatsAggNamespace]):
         if len(dcs_and_bad_data) > 0:
             print(f"These {league} games are missing data:")
             print(dcs_and_bad_data.to_dict(orient="records"))
+
+        # TODO annotate player names / swap team names with player names
 
         annotate_game_results(df, league, False)
         team_stats_df = agg_team_stats(df)

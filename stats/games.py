@@ -49,8 +49,10 @@ def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = 
 
     if playoffs:
         games_df.week = pd.NA
+        games_df["playoffs"] = True
     else:
         games_df["round"] = pd.NA
+        games_df["playoffs"] = False
 
 
 def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
@@ -178,20 +180,17 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
 
 def normalize_games(games_df: pd.DataFrame):
     # we want each game from the home and away perspective so we can index by team
-    dup_games_df = games_df.loc[games_df.index.repeat(2)]
-    away_games: pd.DataFrame = dup_games_df.iloc[0::2]
-    home_games: pd.DataFrame = dup_games_df[dup_games_df.index % 2 != 0]
+    away_games_df = games_df.copy()
 
-    # doesn't matter that we're starting the new normalized DF from the away games. we'll vertically append the home games afterwards
-    normalized_df = away_games.copy()
+    # rename columns for a single-team-centric row. it doesn't matter that we're starting the new normalized DF from the away games. we'll vertically append the home games afterwards
 
-    # rename columns for a single-team-centric row
-    normalized_df.rename(
+    # rename columns for away teams
+    away_games_df.rename(
         columns={
             "away": "team",
             "home": "opponent",
-            "win": "a_win",
-            "loss": "a_loss",
+            "a_win": "win",
+            "a_loss": "loss",
             "a_run_rule_win": "run_rule_win",
             "a_run_rule_loss": "run_rule_loss",
             "a_score": "rs",
@@ -203,6 +202,7 @@ def normalize_games(games_df: pd.DataFrame):
             "a_rbi": "rbi",
             "a_bb": "bb",
             "a_so": "so",
+            "h_ab": "oppab",
             "h_h": "opph",
             "h_hr": "opphr",
             "h_rbi": "opprbi",
@@ -212,12 +212,13 @@ def normalize_games(games_df: pd.DataFrame):
         inplace=True,
     )
 
-    normalized_df.drop(
+    away_games_df.drop(
         columns=[
             # redundant
             "a_r",
             "h_r",
             # not relevant for the away team
+            "h_e",
             "h_loss",
             "h_run_rule_win",
             "h_run_rule_loss",
@@ -225,3 +226,52 @@ def normalize_games(games_df: pd.DataFrame):
         ],
         inplace=True,
     )
+
+    # follow the same renaming and dropping for home teams
+    home_games_df = games_df.copy()
+
+    # rename columns for home teams
+    home_games_df.rename(
+        columns={
+            "home": "team",
+            "away": "opponent",
+            "h_win": "win",
+            "h_loss": "loss",
+            "h_run_rule_win": "run_rule_win",
+            "h_run_rule_loss": "run_rule_loss",
+            "h_score": "rs",
+            "a_score": "ra",
+            "h_e": "e",
+            "h_ab": "ab",
+            "h_h": "h",
+            "h_hr": "hr",
+            "h_rbi": "rbi",
+            "h_bb": "bb",
+            "h_so": "so",
+            "a_ab": "oppab",
+            "a_h": "opph",
+            "a_hr": "opphr",
+            "a_rbi": "opprbi",
+            "a_bb": "oppbb",
+            "a_so": "oppso",
+        },
+        inplace=True,
+    )
+
+    home_games_df.drop(
+        columns=[
+            # redundant
+            "a_r",
+            "h_r",
+            # not relevant for the away team
+            "a_e",
+            "a_loss",
+            "a_run_rule_win",
+            "a_run_rule_loss",
+            "a_win",
+        ],
+        inplace=True,
+    )
+
+    normalized_df = pd.concat([away_games_df, home_games_df], ignore_index=True)
+    return normalized_df
