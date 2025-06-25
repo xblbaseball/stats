@@ -71,6 +71,8 @@ def prep_career_stats(args: type[StatsAggNamespace], league: str):
 
     h2h_df["league"] = league
 
+    # TODO try to multiindex on player, league, season?
+
     # make career data's columns match box scores so we can use the same methods
     career_cols_to_box_scores_cols(h2h_df)
     annotate_game_results(h2h_df, league, playoffs=False)
@@ -127,8 +129,25 @@ def build_career_stats(args: type[StatsAggNamespace]) -> CareerStats:
     ]
 
     all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
-    all_games_by_player_df = agg_team_stats(all_games_ever_df, index="player")
-    print(all_games_by_player_df)
+
+    # TODO filter on league, season, player, then agg stats
+
+    # by_season_df = all_games_ever_df[
+    #     (all_games_ever_df.season == 18) & (all_games_ever_df.away == "shameronium")
+    # ]
+    # print(by_season_df)
+
+    by_season_df = all_games_ever_df.groupby("season")
+    by_league_df = all_games_ever_df.groupby("league")
+
+    # all_games_by_player_df = agg_team_stats(all_games_ever_df, index="player")
+    # print(all_games_by_player_df)
+
+    # eras_df = all_games_by_player_df.groupby(["league", "season"]).agg(
+    #     runs=("rs", "sum"), innings_pitching=("innings_pitching", "sum")
+    # )
+
+    # print(eras_df)
 
     # TODO need league ERAs here
 
@@ -185,6 +204,8 @@ def main(args: type[StatsAggNamespace]):
             args.g_sheets_dir / f"{league}__Box%20Scores.json",
             str_cols=["Away", "Home", "Week"],
         )
+
+        df["season"] = args.season
 
         dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
         if len(dcs_and_bad_data) > 0:

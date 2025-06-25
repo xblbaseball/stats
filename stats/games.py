@@ -55,7 +55,6 @@ def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = 
 
 def agg_team_stats(all_games_df: pd.DataFrame, index="team") -> pd.DataFrame:
     """Aggregate stats by team across all games in the input dataframe. Assumes games have been annotated with `annotate_game_results`"""
-
     home_stats_df = all_games_df.groupby("home").agg(
         league=("league", "first"),
         wins=("h_win", "sum"),
@@ -174,4 +173,55 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     ) / 2
     team_stats_df["innings_game"] = (
         team_stats_df.innings_played / team_stats_df.games_played
+    )
+
+
+def normalize_games(games_df: pd.DataFrame):
+    # we want each game from the home and away perspective so we can index by team
+    dup_games_df = games_df.loc[games_df.index.repeat(2)]
+    away_games: pd.DataFrame = dup_games_df.iloc[0::2]
+    home_games: pd.DataFrame = dup_games_df[dup_games_df.index % 2 != 0]
+
+    # doesn't matter that we're starting the new normalized DF from the away games. we'll vertically append the home games afterwards
+    normalized_df = away_games.copy()
+
+    # rename columns for a single-team-centric row
+    normalized_df.rename(
+        columns={
+            "away": "team",
+            "home": "opponent",
+            "win": "a_win",
+            "loss": "a_loss",
+            "a_run_rule_win": "run_rule_win",
+            "a_run_rule_loss": "run_rule_loss",
+            "a_score": "rs",
+            "h_score": "ra",
+            "a_e": "e",
+            "a_ab": "ab",
+            "a_h": "h",
+            "a_hr": "hr",
+            "a_rbi": "rbi",
+            "a_bb": "bb",
+            "a_so": "so",
+            "h_h": "opph",
+            "h_hr": "opphr",
+            "h_rbi": "opprbi",
+            "h_bb": "oppbb",
+            "h_so": "oppso",
+        },
+        inplace=True,
+    )
+
+    normalized_df.drop(
+        columns=[
+            # redundant
+            "a_r",
+            "h_r",
+            # not relevant for the away team
+            "h_loss",
+            "h_run_rule_win",
+            "h_run_rule_loss",
+            "h_win",
+        ],
+        inplace=True,
     )
