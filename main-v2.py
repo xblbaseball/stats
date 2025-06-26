@@ -10,7 +10,6 @@ from typing import List
 from stats import gsheets
 from stats.careers import career_cols_to_box_scores_cols
 from stats.games import (
-    agg_team_stats,
     annotate_computed_stats,
     annotate_game_results,
     normalize_games,
@@ -124,16 +123,6 @@ def build_career_stats(
     """
 
     print(f"Running career stats...")
-
-    # get regular season stats for all players across all leagues and all seasons and all head to heads
-    [xbl_h2h_df, aaa_h2h_df, aa_h2h_df] = [
-        prep_career_stats(args, all_players, league) for league in LEAGUES
-    ]
-
-    all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
-    all_time_stats_df = all_games_ever_df.groupby("player").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
-
-    annotate_computed_stats(all_time_stats_df, league_era=1.0)
 
     # TODO filter on league, season, player, then agg stats
 
@@ -277,6 +266,7 @@ def main(args: type[StatsAggNamespace]) -> str | None:
 
     # season stats collection
     for league in LEAGUES:
+        # used for both season_team_stats and season_game_results
         df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Box%20Scores.json",
             str_cols=["Away", "Home", "Week"],
@@ -290,9 +280,75 @@ def main(args: type[StatsAggNamespace]) -> str | None:
             print(f"These {league} games are missing data:")
             print(dcs_and_bad_data.to_dict(orient="records"))
 
+        # note this returns a normalized DataFrame AND mutates the input
         normalized_df = gsheets.normalize_box_scores_spreadsheet(
             df, active_players, league
         )
+
+        #
+        # build season_stats.season_game_results
+        #
+
+        game_results_df = df.copy()
+
+        # take steps to match GameResults
+        game_results_df.rename(
+            columns={
+                "away": "away_team",
+                "a_score": "away_score",
+                "a_ab": "away_ab",
+                "a_r": "away_r",
+                "a_h": "away_hits",
+                "a_hr": "away_hr",
+                "a_rbi": "away_rbi",
+                "a_bb": "away_bb",
+                "a_so": "away_so",
+                "a_e": "away_e",
+                "home": "home_team",
+                "h_score": "home_score",
+                "h_ab": "home_ab",
+                "h_r": "home_r",
+                "h_h": "home_hits",
+                "h_hr": "home_hr",
+                "h_rbi": "home_rbi",
+                "h_bb": "home_bb",
+                "h_so": "home_so",
+                "h_e": "home_e",
+            },
+            inplace=True,
+        )
+
+        game_results_df["winner"] = game_results_df.apply(
+            lambda row: (row["home_team"] if row["h_win"] else row["away_team"]),
+            axis=1,
+        )
+
+        game_results_df["run_rule"] = game_results_df.apply(
+            lambda row: row["a_run_rule_win"] or row["h_run_rule_win"], axis=1
+        )
+
+        # remove a couple more columns that aren't needed in the JSON
+        game_results_df.drop(
+            columns=[
+                "a_loss",
+                "a_run_rule_win",
+                "a_run_rule_loss",
+                "a_win",
+                "h_loss",
+                "h_run_rule_win",
+                "h_run_rule_loss",
+                "h_win",
+            ],
+            inplace=True,
+        )
+
+        season_stats_to_write["season_game_results"] += game_results_df.to_dict(  # type: ignore
+            orient="records"
+        )
+
+        #
+        # build season_stats.season_team_stats
+        #
 
         # a query that sums raw numbers for each team for the season
         # TODO do we need to include season here?
@@ -314,17 +370,29 @@ def main(args: type[StatsAggNamespace]) -> str | None:
             orient="index"
         )
 
-        # season_stats_to_write["season_team_stats"][team] = {}
+        #
+        # build season_stats.season_team_records
+        #
 
-        # standings_df = gsheets.json_as_df(
-        #     args.g_sheets_dir / f"{league}__Standings.json",
-        #     str_cols=["ELO", "GB", "Team Name"],
-        # )
-        # clean_standings(standings_df, league)
+        standings_df = gsheets.json_as_df(
+            args.g_sheets_dir / f"{league}__Standings.json",
+            str_cols=["ELO", "GB", "Team Name"],
+        )
+        clean_standings(standings_df, league)
 
-        # TODO write these somewhere!
+        season_stats_to_write["season_team_records"] |= standings_df.to_dict(orient="index")  # type: ignore
 
-    print(season_stats_to_write)
+    # career stats are generated across all leagues
+
+    # get regular season stats for all players across all leagues and all seasons and all head to heads
+    [xbl_h2h_df, aaa_h2h_df, aa_h2h_df] = [
+        prep_career_stats(args, all_players, league) for league in LEAGUES
+    ]
+
+    all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
+    all_time_stats_df = all_games_ever_df.groupby("player").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
+
+    annotate_computed_stats(all_time_stats_df, league_era=1.0)
 
     # career_data = build_career_stats(args, all_players)
 

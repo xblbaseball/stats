@@ -2,7 +2,18 @@ import pandas as pd
 
 
 def clean_standings(standings_df: pd.DataFrame, league: str):
-    """Update the DataFrame in place. Clean up standings data"""
+    """Update the DataFrame in place. Clean up standings data
+
+    Args:
+        standings_df DataFrame with data from a *__Standings.json spreadsheet
+        league str
+    """
+
+    # ELOs over 1000 have commas that need to be removed... thanks Wishbone
+    standings_df["elo"] = standings_df["elo"].apply(
+        lambda elo: int(elo.replace(",", ""))
+    )
+
     columns_to_rename = {
         "#": "rank",
         "1run": "one_run",
@@ -10,6 +21,7 @@ def clean_standings(standings_df: pd.DataFrame, league: str):
         "inn/gm": "innings_per_game",
         "l": "losses",
         "l_sweeps": "sweeps_l",
+        "team_name": "team",
         "w": "wins",
         "w_sweeps": "sweeps_w",
         "w%": "win_pct",
@@ -40,3 +52,7 @@ def clean_standings(standings_df: pd.DataFrame, league: str):
         ],
         inplace=True,
     )
+
+    # create a column just to use as the index so we can get the team name in the record as well
+    standings_df["team_index"] = standings_df["team"]
+    standings_df.set_index("team_index", inplace=True)

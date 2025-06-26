@@ -68,6 +68,15 @@ def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
 def normalize_box_scores_spreadsheet(
     df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
 ):
+    """Both annotates the input DataFrame in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
+
+    Args:
+        df DataFrame from a *__Box%20Scores.json spreadsheet
+        active_players dict[player] = [TeamSeason]
+        league str
+    Returns:
+        DataFrame normalized to the standard in docs/data-structures.md
+    """
     annotate_game_results(df, league, playoffs=False)
     teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
     df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
