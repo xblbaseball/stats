@@ -12,6 +12,7 @@ from stats.careers import career_cols_to_box_scores_cols
 from stats.games import (
     annotate_computed_stats,
     annotate_game_results,
+    make_game_results,
     normalize_games,
 )
 from stats.models import *
@@ -240,7 +241,11 @@ def main(args: type[StatsAggNamespace]) -> str | None:
     }
 
     # will be filled out and written to HTML
-    missing_games_to_write = []
+    missing_games_to_write = {
+        "XBL": {"regular_season": [], "playoffs": []},
+        "AAA": {"regular_season": [], "playoffs": []},
+        "AA": {"regular_season": [], "playoffs": []},
+    }
 
     # a DF that maps (human) players with teams they've played as
     team_abbrev_df = [
@@ -266,6 +271,9 @@ def main(args: type[StatsAggNamespace]) -> str | None:
 
     # season stats collection
     for league in LEAGUES:
+        print(
+            f"Running season {args.season} stats for regular season {league} games..."
+        )
         # used for both season_team_stats and season_game_results
         df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Box%20Scores.json",
@@ -276,12 +284,12 @@ def main(args: type[StatsAggNamespace]) -> str | None:
 
         dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
         if len(dcs_and_bad_data) > 0:
-            # TODO write public/missing-games.html
-            print(f"These {league} games are missing data:")
-            print(dcs_and_bad_data.to_dict(orient="records"))
+            missing_games_to_write[league][
+                "regular_season"
+            ] += dcs_and_bad_data.to_dict(orient="records")
 
         # note this returns a normalized DataFrame AND mutates the input
-        normalized_df = gsheets.normalize_box_scores_spreadsheet(
+        normalized_df, annotated_df = gsheets.normalize_box_scores_spreadsheet(
             df, active_players, league
         )
 
@@ -289,62 +297,7 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         # build season_stats.season_game_results
         #
 
-        game_results_df = df.copy()
-
-        # take steps to match GameResults
-        game_results_df.rename(
-            columns={
-                "away": "away_team",
-                "a_score": "away_score",
-                "a_ab": "away_ab",
-                "a_r": "away_r",
-                "a_h": "away_hits",
-                "a_hr": "away_hr",
-                "a_rbi": "away_rbi",
-                "a_bb": "away_bb",
-                "a_so": "away_so",
-                "a_e": "away_e",
-                "home": "home_team",
-                "h_score": "home_score",
-                "h_ab": "home_ab",
-                "h_r": "home_r",
-                "h_h": "home_hits",
-                "h_hr": "home_hr",
-                "h_rbi": "home_rbi",
-                "h_bb": "home_bb",
-                "h_so": "home_so",
-                "h_e": "home_e",
-            },
-            inplace=True,
-        )
-
-        game_results_df["winner"] = game_results_df.apply(
-            lambda row: (row["home_team"] if row["h_win"] else row["away_team"]),
-            axis=1,
-        )
-
-        game_results_df["run_rule"] = game_results_df.apply(
-            lambda row: row["a_run_rule_win"] or row["h_run_rule_win"], axis=1
-        )
-
-        # remove a couple more columns that aren't needed in the JSON
-        game_results_df.drop(
-            columns=[
-                "a_loss",
-                "a_run_rule_win",
-                "a_run_rule_loss",
-                "a_win",
-                "h_loss",
-                "h_run_rule_win",
-                "h_run_rule_loss",
-                "h_win",
-            ],
-            inplace=True,
-        )
-
-        season_stats_to_write["season_game_results"] += game_results_df.to_dict(  # type: ignore
-            orient="records"
-        )
+        season_stats_to_write["season_game_results"] += make_game_results(annotated_df)  # type: ignore
 
         #
         # build season_stats.season_team_stats
@@ -381,6 +334,66 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         clean_standings(standings_df, league)
 
         season_stats_to_write["season_team_records"] |= standings_df.to_dict(orient="index")  # type: ignore
+
+    # playoffs stats collection
+    for league in LEAGUES:
+        print(f"Running season {args.season} stats for {league} playoff games...")
+        df = gsheets.json_as_df(
+            args.g_sheets_dir / f"{league}__Playoffs.json",
+            str_cols=["Away", "Home", "Round"],
+        )
+
+        df["season"] = args.season
+
+        dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
+        if len(dcs_and_bad_data) > 0:
+            missing_games_to_write[league]["playoffs"] += dcs_and_bad_data.to_dict(
+                orient="records"
+            )
+
+        # note this returns a normalized DataFrame AND mutates the input
+        normalized_df = gsheets.normalize_playoffs_spreadsheet(
+            df, active_players, league
+        )
+
+        #
+        # build season_stats_playoffs_game_results
+        #
+
+        season_stats_to_write["playoffs_game_results"] += make_game_results(df)  # type: ignore
+
+        #
+        # build season_stats.playoffs_team_stats
+        #
+
+        # a query that sums raw numbers for each team for the season
+        # TODO do we need to include season here?
+        team_stats_df: pd.DataFrame = normalized_df.groupby("team").agg(
+            team=("team", "first"),
+            player=("player", "first"),
+            **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
+        )
+
+        # needed for the FIP calculation
+        league_era = (
+            9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
+        )
+
+        # actually compute any stats with multiple inputs
+        annotate_computed_stats(team_stats_df, league_era=league_era)
+
+        season_stats_to_write["playoffs_team_stats"] |= team_stats_df.to_dict(  # type: ignore
+            orient="index"
+        )
+
+        #
+        # build season_stats.playoffs_team_records
+        #
+
+        # TODO
+
+    with open("deleteme.json", "w") as f:
+        f.write(json.dumps(season_stats_to_write))
 
     # career stats are generated across all leagues
 

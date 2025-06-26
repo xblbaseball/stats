@@ -68,30 +68,47 @@ def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
 def normalize_box_scores_spreadsheet(
     df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
 ):
-    """Both annotates the input DataFrame in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
+    """Both annotates the input DataFrame of regular season box scores in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
 
     Args:
-        df DataFrame from a *__Box%20Scores.json spreadsheet
+        df DataFrame from a {league}__Box%20Scores.json spreadsheet
         active_players dict[player] = [TeamSeason]
         league str
     Returns:
         DataFrame normalized to the standard in docs/data-structures.md
     """
-    annotate_game_results(df, league, playoffs=False)
+    annotated_df = df.copy()
+    annotate_game_results(annotated_df, league, playoffs=False)
     teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
-    df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
-    df["home_player"] = df["home"].apply(lambda home: teams_to_players[home])
-    return normalize_games(df)
+    annotated_df["away_player"] = annotated_df["away"].apply(
+        lambda away: teams_to_players[away]
+    )
+    annotated_df["home_player"] = annotated_df["home"].apply(
+        lambda home: teams_to_players[home]
+    )
+    return normalize_games(annotated_df), annotated_df
+
+
+# TODO combine above and below fns
 
 
 def normalize_playoffs_spreadsheet(
     df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
 ):
+    """Both annotates the input DataFrame of playoffs box scores in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
+
+    Args:
+        df DataFrame from a {league}__Playoffs.json spreadsheet
+        active_players dict[player] = [TeamSeason]
+        league str
+    Returns:
+        DataFrame normalized to the standard in docs/data-structures.md
+    """
     annotate_game_results(df, league, playoffs=True)
     teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
     df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
     df["home_player"] = df["home"].apply(lambda home: teams_to_players[home])
-    return normalize_games(df)
+    return normalize_games(df, playoffs=True)
 
 
 def normalize_head_to_head_spreadsheet(
@@ -138,4 +155,4 @@ def normalize_head_to_head_spreadsheet(
         axis=1,
     )
 
-    return normalize_games(df)
+    return normalize_games(df, playoffs=playoffs)

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import List
 
-from .models import League
+from .models import GameResults, League
 
 
 def annotate_game_results(games_df: pd.DataFrame, league: str, playoffs: bool = False):
@@ -110,7 +110,7 @@ def annotate_computed_stats(team_stats_df: pd.DataFrame, league_era: float):
     )
 
 
-def normalize_games(games_df: pd.DataFrame):
+def normalize_games(games_df: pd.DataFrame, playoffs=False):
     """Return a DF that has been normalized to match the standard columns described in docs/data-structures.md. There should be two rows for every game, one from away's perspective, another from home's. It expects that the games have been run through `annotate_game_results()` to get basic info, and that both player and team names (i.e., `away`, `away_player`, `home`, and `home_player` columns) are available.
 
     Args:
@@ -138,7 +138,6 @@ def normalize_games(games_df: pd.DataFrame):
             "a_score": "rs",
             "h_score": "ra",
             "ip": "innings",
-            "a_e": "e",
             "a_ab": "ab",
             "a_h": "h",
             "a_hr": "hr",
@@ -154,6 +153,14 @@ def normalize_games(games_df: pd.DataFrame):
         },
         inplace=True,
     )
+
+    if not playoffs:
+        away_games_df.rename(
+            columns={
+                "a_e": "e",
+            },
+            inplace=True,
+        )
 
     away_games_df["innings_hitting"] = away_games_df["innings"].apply(
         lambda ip: np.ceil(ip)
@@ -179,7 +186,6 @@ def normalize_games(games_df: pd.DataFrame):
             "h_score": "rs",
             "a_score": "ra",
             "ip": "innings",
-            "h_e": "e",
             "h_ab": "ab",
             "h_h": "h",
             "h_hr": "hr",
@@ -195,6 +201,14 @@ def normalize_games(games_df: pd.DataFrame):
         },
         inplace=True,
     )
+
+    if not playoffs:
+        away_games_df.rename(
+            columns={
+                "h_e": "e",
+            },
+            inplace=True,
+        )
 
     home_games_df["innings_hitting"] = home_games_df["innings"].apply(
         lambda ip: np.floor(ip)
@@ -235,3 +249,59 @@ def normalize_games(games_df: pd.DataFrame):
 
     normalized_df = pd.concat([away_games_df, home_games_df], ignore_index=True)
     return normalized_df
+
+
+def make_game_results(annotated_game_df: pd.DataFrame) -> List[GameResults]:
+    df = annotated_game_df.copy()
+    # take steps to match GameResults
+    df.rename(
+        columns={
+            "away": "away_team",
+            "a_score": "away_score",
+            "a_ab": "away_ab",
+            "a_r": "away_r",
+            "a_h": "away_hits",
+            "a_hr": "away_hr",
+            "a_rbi": "away_rbi",
+            "a_bb": "away_bb",
+            "a_so": "away_so",
+            "a_e": "away_e",
+            "home": "home_team",
+            "h_score": "home_score",
+            "h_ab": "home_ab",
+            "h_r": "home_r",
+            "h_h": "home_hits",
+            "h_hr": "home_hr",
+            "h_rbi": "home_rbi",
+            "h_bb": "home_bb",
+            "h_so": "home_so",
+            "h_e": "home_e",
+        },
+        inplace=True,
+    )
+
+    df["winner"] = df.apply(
+        lambda row: (row["home_team"] if row["h_win"] else row["away_team"]),
+        axis=1,
+    )
+
+    df["run_rule"] = df.apply(
+        lambda row: row["a_run_rule_win"] or row["h_run_rule_win"], axis=1
+    )
+
+    # remove a couple more columns that aren't needed in the JSON
+    df.drop(
+        columns=[
+            "a_loss",
+            "a_run_rule_win",
+            "a_run_rule_loss",
+            "a_win",
+            "h_loss",
+            "h_run_rule_win",
+            "h_run_rule_loss",
+            "h_win",
+        ],
+        inplace=True,
+    )
+
+    return df.to_dict(orient="records")  # type: ignore
