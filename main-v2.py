@@ -17,7 +17,7 @@ from stats.games import (
 )
 from stats.models import *
 from stats.players import aggregate_players, get_active_players
-from stats.teams import clean_standings
+from stats.standings import clean_standings
 
 LEAGUES = ["XBL", "AAA", "AA"]
 
@@ -134,14 +134,13 @@ def build_career_stats(
     all_time_stats_df = all_games_ever_df.groupby("player").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
 
     annotate_computed_stats(all_time_stats_df, league_era=1.0)
-    print(len(all_time_stats_df))
 
     # TODO filter on league, season, player, then agg stats
 
     # by_season_df = all_games_ever_df[
     #     (all_games_ever_df.season == 18) & (all_games_ever_df.away == "shameronium")
     # ]
-    # print(by_season_df)
+    # print(by_season_df)1
 
     # TODO:
     # - all-time
@@ -221,7 +220,39 @@ def clean_box_scores(games_df: pd.DataFrame, players_df: pd.DataFrame):
     pass
 
 
-def main(args: type[StatsAggNamespace]):
+def main(args: type[StatsAggNamespace]) -> str | None:
+    """Collect season and all-time stats, write to JSON
+
+    Args:
+        args StatsAggNamespace
+    Returns:
+        str | None
+    """
+
+    # will be filled out and written to JSON
+    season_stats_to_write: SeasonStats = {
+        "current_season": args.season,
+        "season_team_records": {},
+        "season_team_stats": {},
+        "season_game_results": [],
+        "playoffs_team_records": {},
+        "playoffs_team_stats": {},
+        "playoffs_game_results": [],
+    }
+
+    # will be filled out and written to JSON
+    career_stats_to_write: CareerStats = {
+        "all_players": {},
+        "active_players": {},
+        "regular_season": {},
+        "regular_season_head_to_head": [],
+        "playoffs": {},
+        "playoffs_head_to_head": [],
+    }
+
+    # will be filled out and written to HTML
+    missing_games_to_write = []
+
     # a DF that maps (human) players with teams they've played as
     team_abbrev_df = [
         gsheets.json_as_df(
@@ -241,7 +272,10 @@ def main(args: type[StatsAggNamespace]):
     all_players = aggregate_players(*team_abbrev_df)
     active_players = get_active_players(all_players, args.season)
 
-    # regular season
+    career_stats_to_write["all_players"] = all_players
+    career_stats_to_write["active_players"] = active_players
+
+    # season stats collection
     for league in LEAGUES:
         df = gsheets.json_as_df(
             args.g_sheets_dir / f"{league}__Box%20Scores.json",
@@ -260,14 +294,27 @@ def main(args: type[StatsAggNamespace]):
             df, active_players, league
         )
 
-        team_stats_df = normalized_df.groupby("team").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
+        # a query that sums raw numbers for each team for the season
+        # TODO do we need to include season here?
+        team_stats_df: pd.DataFrame = normalized_df.groupby("team").agg(
+            team=("team", "first"),
+            player=("player", "first"),
+            **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
+        )
 
+        # needed for the FIP calculation
         league_era = (
             9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
         )
+
+        # actually compute any stats with multiple inputs
         annotate_computed_stats(team_stats_df, league_era=league_era)
 
-        # print(team_stats_df)
+        season_stats_to_write["season_team_stats"] |= team_stats_df.to_dict(  # type: ignore
+            orient="index"
+        )
+
+        # season_stats_to_write["season_team_stats"][team] = {}
 
         # standings_df = gsheets.json_as_df(
         #     args.g_sheets_dir / f"{league}__Standings.json",
@@ -277,7 +324,9 @@ def main(args: type[StatsAggNamespace]):
 
         # TODO write these somewhere!
 
-    career_data = build_career_stats(args, all_players)
+    print(season_stats_to_write)
+
+    # career_data = build_career_stats(args, all_players)
 
     # career_json = args.save_dir / "careers.json"
     # print(f"Writing {career_json}...")
