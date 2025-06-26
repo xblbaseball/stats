@@ -89,7 +89,9 @@ AGG_NORMALIZED_STATS_KWARGS = {
 }
 
 
-def prep_career_stats(args: type[StatsAggNamespace], league: str):
+def prep_career_stats(
+    args: type[StatsAggNamespace], all_players: dict[str, Player], league: str
+):
     df = gsheets.json_as_df(
         args.g_sheets_dir / f"CAREER_STATS__{league}%20Head%20to%20Head.json",
         str_cols=[
@@ -103,7 +105,11 @@ def prep_career_stats(args: type[StatsAggNamespace], league: str):
 
     df["league"] = league
 
-    return df
+    normalized_df = gsheets.normalize_head_to_head_spreadsheet(
+        df, all_players, league, playoffs=False
+    )
+
+    return normalized_df
 
 
 def build_career_stats(
@@ -121,14 +127,14 @@ def build_career_stats(
 
     # get regular season stats for all players across all leagues and all seasons and all head to heads
     [xbl_h2h_df, aaa_h2h_df, aa_h2h_df] = [
-        prep_career_stats(args, league) for league in LEAGUES
+        prep_career_stats(args, all_players, league) for league in LEAGUES
     ]
 
     all_games_ever_df = pd.concat([xbl_h2h_df, aaa_h2h_df, aa_h2h_df])
+    all_time_stats_df = all_games_ever_df.groupby("player").agg(**AGG_NORMALIZED_STATS_KWARGS)  # type: ignore
 
-    gsheets.normalize_head_to_head_spreadsheet(
-        all_games_ever_df, all_players, playoffs=False
-    )
+    annotate_computed_stats(all_time_stats_df, league_era=1.0)
+    print(len(all_time_stats_df))
 
     # TODO filter on league, season, player, then agg stats
 
@@ -145,13 +151,13 @@ def build_career_stats(
     # - per playoffs
     # - per league playoffs
 
-    groupby_season = all_games_ever_df.groupby(["season", "league", "team"])
-    ba_per_season_league_team = groupby_season.agg(ab=("ab", "sum"), hits=("h", "sum"))
+    # groupby_season = all_games_ever_df.groupby(["season", "league", "team"])
+    # ba_per_season_league_team = groupby_season.agg(ab=("ab", "sum"), hits=("h", "sum"))
 
-    ba_per_season_league = ba_per_season_league_team.groupby(["season", "league"]).agg(
-        ab=("ab", "sum"), hits=("hits", "sum")
-    )
-    print(ba_per_season_league["hits"] / ba_per_season_league["ab"])
+    # ba_per_season_league = ba_per_season_league_team.groupby(["season", "league"]).agg(
+    #     ab=("ab", "sum"), hits=("hits", "sum")
+    # )
+    # print(ba_per_season_league["hits"] / ba_per_season_league["ab"])
 
     # all_games_by_player_df = agg_team_stats(all_games_ever_df, index="player")
     # print(all_games_by_player_df)
@@ -207,7 +213,8 @@ def build_career_stats(
     # data["playoffs"] = playoffs
     # data["playoffs_head_to_head"] = playoffs_head_to_head
 
-    return data
+    # return data
+    return None
 
 
 def clean_box_scores(games_df: pd.DataFrame, players_df: pd.DataFrame):
@@ -260,7 +267,7 @@ def main(args: type[StatsAggNamespace]):
         )
         annotate_computed_stats(team_stats_df, league_era=league_era)
 
-        print(team_stats_df)
+        # print(team_stats_df)
 
         # standings_df = gsheets.json_as_df(
         #     args.g_sheets_dir / f"{league}__Standings.json",

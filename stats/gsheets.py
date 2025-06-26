@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 from stats.games import annotate_game_results, normalize_games
-from stats.models import TeamSeason
+from stats.models import Player, TeamSeason
 
 
 def json_as_df(path_to_json: Path, str_cols: List[str] = []) -> pd.DataFrame:
@@ -65,23 +65,6 @@ def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
     return all_nan_rows
 
 
-def career_cols_to_season_cols(df: pd.DataFrame):
-    """Update the CAREER_STATS__* and PLAYOFF_STATS__* DataFrames in place to match the columns we get in the current season's box scores.
-
-    Args:
-        df DataFrame from Head to Head data"""
-    df.rename(
-        columns={
-            "away_player": "away",
-            "away_score": "a_score",
-            "home_player": "home",
-            "home_score": "h_score",
-        },
-        inplace=True,
-    )
-    df.drop(columns=["away_result", "home_result"], inplace=True)
-
-
 def normalize_box_scores_spreadsheet(
     df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
 ):
@@ -104,16 +87,46 @@ def normalize_playoffs_spreadsheet(
 
 def normalize_head_to_head_spreadsheet(
     df: pd.DataFrame,
-    all_players: dict[str, List[TeamSeason]],
+    all_players: dict[str, Player],
+    league: str,
     playoffs=False,
 ):
-    career_cols_to_season_cols(df)
-    annotate_game_results(df, league, playoffs=playoffs)
-    # players_to_teams = {ts["player"]: ts["team_name"] for ts in active_players[league]}
-    # df["away"] = df["away_player"].apply(lambda away_team: players_to_teams[away_team])
-    # df["home"] = df["home_player"].apply(lambda home_team: players_to_teams[home_team])
+    # match the columns that `annotate_game_results()` expects. we'll actually flip these column names back later
+    df.rename(
+        columns={
+            "away_player": "away",
+            "away_score": "a_score",
+            "home_player": "home",
+            "home_score": "h_score",
+        },
+        inplace=True,
+    )
 
-    # extra columns we don't care about
+    # unnecessary
     df.drop(columns=["away_result", "home_result"], inplace=True)
+
+    annotate_game_results(df, league, playoffs=playoffs)
+
+    def team_name_from_player_season(player: str, season: int):
+        teams = all_players[player]["teams"]
+        for team in teams:
+            if team["season"] == season:
+                return team["team_name"]
+
+        raise Exception(f"Couldn't find a team for '{player}' in season '{season}'")
+
+    # flip flop away and home back to the way they were
+    # away and home are actually the players
+    df.rename(columns={"away": "away_player", "home": "home_player"}, inplace=True)
+
+    # now make home and away the team names
+    df["away"] = df.apply(
+        lambda row: team_name_from_player_season(row["away_player"], row["season"]),
+        axis=1,
+    )
+    df["home"] = df.apply(
+        lambda row: team_name_from_player_season(row["home_player"], row["season"]),
+        axis=1,
+    )
 
     return normalize_games(df)
