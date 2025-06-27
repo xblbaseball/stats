@@ -154,6 +154,7 @@ def normalize_games(games_df: pd.DataFrame, playoffs=False):
         inplace=True,
     )
 
+    # for some unknown reason, errors aren't tracked in the playoffs. thanks Wishbone
     if not playoffs:
         away_games_df.rename(
             columns={
@@ -203,7 +204,7 @@ def normalize_games(games_df: pd.DataFrame, playoffs=False):
     )
 
     if not playoffs:
-        away_games_df.rename(
+        home_games_df.rename(
             columns={
                 "h_e": "e",
             },
@@ -224,7 +225,6 @@ def normalize_games(games_df: pd.DataFrame, playoffs=False):
             "a_r",
             "h_r",
             # not relevant for the away team
-            "h_e",
             "h_loss",
             "h_run_rule_win",
             "h_run_rule_loss",
@@ -232,13 +232,16 @@ def normalize_games(games_df: pd.DataFrame, playoffs=False):
         ],
         inplace=True,
     )
+
+    if not playoffs:
+        away_games_df.drop(columns=["h_e"], inplace=True)
+
     home_games_df.drop(
         columns=[
             # redundant
             "a_r",
             "h_r",
             # not relevant for the home team
-            "a_e",
             "a_loss",
             "a_run_rule_win",
             "a_run_rule_loss",
@@ -246,6 +249,9 @@ def normalize_games(games_df: pd.DataFrame, playoffs=False):
         ],
         inplace=True,
     )
+
+    if not playoffs:
+        home_games_df.drop(columns=["a_e"], inplace=True)
 
     normalized_df = pd.concat([away_games_df, home_games_df], ignore_index=True)
     return normalized_df

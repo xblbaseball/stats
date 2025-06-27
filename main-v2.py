@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import List
 
 from stats import gsheets
-from stats.careers import career_cols_to_box_scores_cols
 from stats.games import (
     annotate_computed_stats,
     annotate_game_results,
@@ -17,6 +16,7 @@ from stats.games import (
 )
 from stats.models import *
 from stats.players import aggregate_players, get_active_players
+from stats.playoffs import collect_playoffs_team_records
 from stats.standings import clean_standings
 
 LEAGUES = ["XBL", "AAA", "AA"]
@@ -289,8 +289,8 @@ def main(args: type[StatsAggNamespace]) -> str | None:
             ] += dcs_and_bad_data.to_dict(orient="records")
 
         # note this returns a normalized DataFrame AND mutates the input
-        normalized_df, annotated_df = gsheets.normalize_box_scores_spreadsheet(
-            df, active_players, league
+        normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
+            df, active_players, league, playoffs=False
         )
 
         #
@@ -352,15 +352,15 @@ def main(args: type[StatsAggNamespace]) -> str | None:
             )
 
         # note this returns a normalized DataFrame AND mutates the input
-        normalized_df = gsheets.normalize_playoffs_spreadsheet(
-            df, active_players, league
+        normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
+            df, active_players, league, playoffs=True
         )
 
         #
         # build season_stats_playoffs_game_results
         #
 
-        season_stats_to_write["playoffs_game_results"] += make_game_results(df)  # type: ignore
+        season_stats_to_write["playoffs_game_results"] += make_game_results(annotated_df)  # type: ignore
 
         #
         # build season_stats.playoffs_team_stats
@@ -390,7 +390,9 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         # build season_stats.playoffs_team_records
         #
 
-        # TODO
+        season_stats_to_write["playoffs_team_records"] = collect_playoffs_team_records(
+            annotated_df
+        )
 
     with open("deleteme.json", "w") as f:
         f.write(json.dumps(season_stats_to_write))

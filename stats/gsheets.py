@@ -22,7 +22,9 @@ def json_as_df(path_to_json: Path, str_cols: List[str] = []) -> pd.DataFrame:
 
 
 def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFrame:
-    """Make the actual DataFrame. For column names, cases are lowered, spaces are turned into `_`, and periods are removed. E.g. `A. AB` turns into `a_ab`
+    """Make the actual DataFrame. For column names, cases are lowered, spaces are turned into `_`, and periods are removed. E.g. `A. AB` turns into `a_ab`.
+
+    We automatically cut off any columns missing headers.
 
     Args:
         values list of lists where the first element is the column labels
@@ -30,7 +32,13 @@ def values_to_df(values: List[List[Any]], str_cols: List[str] = []) -> pd.DataFr
     Returns:
         pd.DataFrame
     """
-    df = pd.DataFrame(values[1:], columns=values[0])
+
+    columns = values[0]
+
+    # if any row has data that extends beyond the last column in the header, remove it
+    rows = [row[: len(columns)] for row in values[1:]]
+
+    df = pd.DataFrame(rows, columns=columns)
 
     # fix types
     numeric_cols = [col for col in values[0] if col not in str_cols]
@@ -65,20 +73,26 @@ def find_games_with_bad_data(df: pd.DataFrame) -> pd.DataFrame:
     return all_nan_rows
 
 
-def normalize_box_scores_spreadsheet(
-    df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
+def normalize_season_games_spreadsheet(
+    df: pd.DataFrame,
+    active_players: dict[str, List[TeamSeason]],
+    league: str,
+    playoffs=False,
 ):
-    """Both annotates the input DataFrame of regular season box scores in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
+    """Both annotates the input DataFrame of current season box scores (reg season and playoffs) in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
 
     Args:
-        df DataFrame from a {league}__Box%20Scores.json spreadsheet
+        df DataFrame from a {league}__Box%20Scores.json or {league}_Playoffs.json spreadsheet
         active_players dict[player] = [TeamSeason]
         league str
     Returns:
         DataFrame normalized to the standard in docs/data-structures.md
+        DataFrame annotated with extra info like player names
     """
     annotated_df = df.copy()
-    annotate_game_results(annotated_df, league, playoffs=False)
+
+    annotate_game_results(annotated_df, league, playoffs=playoffs)
+
     teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
     annotated_df["away_player"] = annotated_df["away"].apply(
         lambda away: teams_to_players[away]
@@ -86,29 +100,8 @@ def normalize_box_scores_spreadsheet(
     annotated_df["home_player"] = annotated_df["home"].apply(
         lambda home: teams_to_players[home]
     )
-    return normalize_games(annotated_df), annotated_df
 
-
-# TODO combine above and below fns
-
-
-def normalize_playoffs_spreadsheet(
-    df: pd.DataFrame, active_players: dict[str, List[TeamSeason]], league: str
-):
-    """Both annotates the input DataFrame of playoffs box scores in place to match GameResults as well as return a new normalized DataFrame that matches the standard in docs/data-structures.md
-
-    Args:
-        df DataFrame from a {league}__Playoffs.json spreadsheet
-        active_players dict[player] = [TeamSeason]
-        league str
-    Returns:
-        DataFrame normalized to the standard in docs/data-structures.md
-    """
-    annotate_game_results(df, league, playoffs=True)
-    teams_to_players = {ts["team_name"]: ts["player"] for ts in active_players[league]}
-    df["away_player"] = df["away"].apply(lambda away: teams_to_players[away])
-    df["home_player"] = df["home"].apply(lambda home: teams_to_players[home])
-    return normalize_games(df, playoffs=True)
+    return normalize_games(annotated_df, playoffs=playoffs), annotated_df
 
 
 def normalize_head_to_head_spreadsheet(
