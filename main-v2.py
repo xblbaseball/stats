@@ -1,6 +1,7 @@
 import argparse
 import json
 import math
+import shutil
 import numpy as np
 import os
 import pandas as pd
@@ -206,8 +207,186 @@ def build_career_stats(
     return None
 
 
-def clean_box_scores(games_df: pd.DataFrame, players_df: pd.DataFrame):
-    pass
+def collect_season_stats_for_league(
+    args: type[StatsAggNamespace],
+    league: str,
+    active_players: dict[str, List[TeamSeason]],
+) -> SeasonStats:
+    """Collect stats for all teams in a league for the current season
+
+    Args:
+        args StatsAggNamespace
+        league XBL, AAA, or AA
+        active_players who is in the league currently
+
+    Returns:
+        SeasonStats
+    """
+    # we will fill out each property one-by-one below
+    season_stats_to_write: SeasonStats = {
+        "current_season": args.season,
+        "season_team_records": {},
+        "season_team_stats": {},
+        "season_game_results": [],
+        "playoffs_team_records": {},
+        "playoffs_team_stats": {},
+        "playoffs_game_results": [],
+    }
+
+    # track which games are going to get ignored when we compute team stats
+    missing_games_to_write = {"regular_season": [], "playoffs": []}
+
+    # TODO it would be nice to also have sanity checks on the stats collected. like innings should never be above, say, 30. we could keep these games but put them in a list that could be reviewed by LO to ensure correctness
+
+    ###
+    # REGULAR SEASON
+    ###
+    print(f"Running season {args.season} stats for regular season {league} games...")
+    # used for both season_team_stats and season_game_results
+    df = gsheets.json_as_df(
+        args.g_sheets_dir / f"{league}__Box%20Scores.json",
+        str_cols=["Away", "Home", "Week"],
+    )
+
+    df["season"] = args.season
+
+    dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
+    if len(dcs_and_bad_data) > 0:
+        missing_games_to_write["regular_season"] += dcs_and_bad_data.to_dict(
+            orient="records"
+        )
+
+    # note this returns a normalized DataFrame AND mutates the input
+    normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
+        df, active_players, league, playoffs=False
+    )
+
+    #
+    # build season_stats.season_game_results
+    #
+
+    season_stats_to_write["season_game_results"] += make_game_results(annotated_df)  # type: ignore
+
+    #
+    # build season_stats.season_team_stats
+    #
+
+    # remove DCs and games with missing data first. we don't want to include games with missing stats when we collect computed stats
+    # we know either 'week' or 'round' will be na, so ignore those columns when determining which games are DCs
+    all_columns_but_week_or_round = [
+        col for col in normalized_df.columns if col not in ["week", "round"]
+    ]
+    normalized_games_no_dcs_df = normalized_df.dropna(
+        subset=all_columns_but_week_or_round
+    )
+
+    # a query that sums raw numbers for each team for the season
+    # TODO do we need to include season here?
+    team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
+        team=("team", "first"),
+        player=("player", "first"),
+        **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
+    )
+
+    # needed for the FIP calculation
+    league_era = (
+        9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
+    )
+
+    # actually compute any stats with multiple inputs
+    annotate_computed_stats(team_stats_df, league_era=league_era)
+
+    season_stats_to_write["season_team_stats"] |= team_stats_df.to_dict(  # type: ignore
+        orient="index"
+    )
+
+    #
+    # build season_stats.season_team_records
+    #
+
+    standings_df = gsheets.json_as_df(
+        args.g_sheets_dir / f"{league}__Standings.json",
+        str_cols=["ELO", "GB", "Team Name"],
+    )
+    clean_standings(standings_df, league)
+
+    season_stats_to_write["season_team_records"] |= standings_df.to_dict(orient="index")  # type: ignore
+
+    # lets explicitly restart all the variables for the playoffs
+    del df
+    del annotated_df
+    del normalized_df
+    del normalized_games_no_dcs_df
+    del team_stats_df
+
+    ###
+    # PLAYOFFS
+    ###
+
+    print(f"Running season {args.season} stats for {league} playoff games...")
+    df = gsheets.json_as_df(
+        args.g_sheets_dir / f"{league}__Playoffs.json",
+        str_cols=["Away", "Home", "Round"],
+    )
+
+    df["season"] = args.season
+
+    dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
+    if len(dcs_and_bad_data) > 0:
+        missing_games_to_write["playoffs"] += dcs_and_bad_data.to_dict(orient="records")
+
+    # note this returns a normalized DataFrame AND mutates the input
+    normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
+        df, active_players, league, playoffs=True
+    )
+
+    #
+    # build season_stats_playoffs_game_results
+    #
+
+    season_stats_to_write["playoffs_game_results"] += make_game_results(annotated_df)  # type: ignore
+
+    #
+    # build season_stats.playoffs_team_stats
+    #
+
+    # remove DCs and games with missing data (NAs) first. we don't want to include games with missing stats when we collect computed stats
+    # we know either 'week' or 'round' will be NA, so ignore those columns when determining which games are DCs
+    all_columns_but_week_or_round = [
+        col for col in normalized_df.columns if col not in ["week", "round"]
+    ]
+    normalized_games_no_dcs_df = normalized_df.dropna(
+        subset=all_columns_but_week_or_round
+    )
+
+    # a query that sums raw numbers for each team for the season
+    team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
+        team=("team", "first"),
+        player=("player", "first"),
+        **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
+    )
+
+    # needed for the FIP calculation
+    league_era = (
+        9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
+    )
+
+    # actually compute any stats with multiple inputs
+    annotate_computed_stats(team_stats_df, league_era=league_era)
+
+    season_stats_to_write["playoffs_team_stats"] |= team_stats_df.to_dict(  # type: ignore
+        orient="index"
+    )
+
+    #
+    # build season_stats.playoffs_team_records
+    #
+
+    season_stats_to_write["playoffs_team_records"] = collect_playoffs_team_records(
+        normalized_df
+    )
+
+    return (season_stats_to_write, missing_games_to_write)
 
 
 def main(args: type[StatsAggNamespace]) -> str | None:
@@ -218,17 +397,6 @@ def main(args: type[StatsAggNamespace]) -> str | None:
     Returns:
         str | None
     """
-
-    # will be filled out and written to JSON
-    season_stats_to_write: SeasonStats = {
-        "current_season": args.season,
-        "season_team_records": {},
-        "season_team_stats": {},
-        "season_game_results": [],
-        "playoffs_team_records": {},
-        "playoffs_team_stats": {},
-        "playoffs_game_results": [],
-    }
 
     # will be filled out and written to JSON
     career_stats_to_write: CareerStats = {
@@ -269,151 +437,17 @@ def main(args: type[StatsAggNamespace]) -> str | None:
     career_stats_to_write["all_players"] = all_players
     career_stats_to_write["active_players"] = active_players
 
-    # season stats collection
     for league in LEAGUES:
-        print(
-            f"Running season {args.season} stats for regular season {league} games..."
+        league_season_stats, missing_games_and_dcs = collect_season_stats_for_league(
+            args, league, active_players
         )
-        # used for both season_team_stats and season_game_results
-        df = gsheets.json_as_df(
-            args.g_sheets_dir / f"{league}__Box%20Scores.json",
-            str_cols=["Away", "Home", "Week"],
-        )
+        missing_games_to_write[league] = missing_games_and_dcs
+        season_json = args.save_dir.joinpath(f"{league}__s{args.season}.json")
+        print(f"Writing {season_json}...")
+        with open(season_json, "w") as f:
+            f.write(json.dumps(league_season_stats))
 
-        df["season"] = args.season
-
-        dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
-        if len(dcs_and_bad_data) > 0:
-            missing_games_to_write[league][
-                "regular_season"
-            ] += dcs_and_bad_data.to_dict(orient="records")
-
-        # note this returns a normalized DataFrame AND mutates the input
-        normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
-            df, active_players, league, playoffs=False
-        )
-
-        #
-        # build season_stats.season_game_results
-        #
-
-        season_stats_to_write["season_game_results"] += make_game_results(annotated_df)  # type: ignore
-
-        #
-        # build season_stats.season_team_stats
-        #
-
-        # remove DCs and games with missing data first. we don't want to include games with missing stats when we collect computed stats
-        # we know either 'week' or 'round' will be na, so ignore those columns when determining which games are DCs
-        all_columns_but_week_or_round = [
-            col for col in normalized_df.columns if col not in ["week", "round"]
-        ]
-        normalized_games_no_dcs_df = normalized_df.dropna(
-            subset=all_columns_but_week_or_round
-        )
-
-        # a query that sums raw numbers for each team for the season
-        # TODO do we need to include season here?
-        team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
-            team=("team", "first"),
-            player=("player", "first"),
-            **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
-        )
-
-        # needed for the FIP calculation
-        league_era = (
-            9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
-        )
-
-        # actually compute any stats with multiple inputs
-        annotate_computed_stats(team_stats_df, league_era=league_era)
-
-        season_stats_to_write["season_team_stats"] |= team_stats_df.to_dict(  # type: ignore
-            orient="index"
-        )
-
-        #
-        # build season_stats.season_team_records
-        #
-
-        standings_df = gsheets.json_as_df(
-            args.g_sheets_dir / f"{league}__Standings.json",
-            str_cols=["ELO", "GB", "Team Name"],
-        )
-        clean_standings(standings_df, league)
-
-        season_stats_to_write["season_team_records"] |= standings_df.to_dict(orient="index")  # type: ignore
-
-    # playoffs stats collection
-    for league in LEAGUES:
-        print(f"Running season {args.season} stats for {league} playoff games...")
-        df = gsheets.json_as_df(
-            args.g_sheets_dir / f"{league}__Playoffs.json",
-            str_cols=["Away", "Home", "Round"],
-        )
-
-        df["season"] = args.season
-
-        dcs_and_bad_data = gsheets.find_games_with_bad_data(df)
-        if len(dcs_and_bad_data) > 0:
-            missing_games_to_write[league]["playoffs"] += dcs_and_bad_data.to_dict(
-                orient="records"
-            )
-
-        # note this returns a normalized DataFrame AND mutates the input
-        normalized_df, annotated_df = gsheets.normalize_season_games_spreadsheet(
-            df, active_players, league, playoffs=True
-        )
-
-        #
-        # build season_stats_playoffs_game_results
-        #
-
-        season_stats_to_write["playoffs_game_results"] += make_game_results(annotated_df)  # type: ignore
-
-        #
-        # build season_stats.playoffs_team_stats
-        #
-
-        # remove DCs and games with missing data first. we don't want to include games with missing stats when we collect computed stats
-        # we know either 'week' or 'round' will be na, so ignore those columns when determining which games are DCs
-        all_columns_but_week_or_round = [
-            col for col in normalized_df.columns if col not in ["week", "round"]
-        ]
-        normalized_games_no_dcs_df = normalized_df.dropna(
-            subset=all_columns_but_week_or_round
-        )
-
-        # a query that sums raw numbers for each team for the season
-        # TODO do we need to include season here?
-        team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
-            team=("team", "first"),
-            player=("player", "first"),
-            **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
-        )
-
-        # needed for the FIP calculation
-        league_era = (
-            9 * np.sum(team_stats_df["r"]) / np.sum(team_stats_df["innings_pitching"])
-        )
-
-        # actually compute any stats with multiple inputs
-        annotate_computed_stats(team_stats_df, league_era=league_era)
-
-        season_stats_to_write["playoffs_team_stats"] |= team_stats_df.to_dict(  # type: ignore
-            orient="index"
-        )
-
-        #
-        # build season_stats.playoffs_team_records
-        #
-
-        season_stats_to_write["playoffs_team_records"] = collect_playoffs_team_records(
-            normalized_df
-        )
-
-    with open("deleteme.json", "w") as f:
-        f.write(json.dumps(season_stats_to_write))
+        shutil.copy(season_json, args.save_dir.joinpath(f"{league}.json"))
 
     # career stats are generated across all leagues
 

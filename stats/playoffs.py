@@ -1,12 +1,19 @@
 import copy
 import pandas as pd
-from typing import List
 
-from stats.models import PlayoffsGameResults, PlayoffsRound, PlayoffsTeamRecord
+from stats.models import PlayoffsRound, PlayoffsTeamRecord
 
 
-def collect_playoffs_team_records(normalized_df: pd.DataFrame):
-    """figure out how each round of the playoffs is going for each team"""
+def collect_playoffs_team_records(
+    normalized_df: pd.DataFrame,
+) -> dict[str, PlayoffsTeamRecord]:
+    """figure out how each round of the playoffs is going for each team
+
+    Args:
+        normalized_df: pd.DataFrame that has gone through `normalize_games`
+    Returns:
+        playoff results as dict[str, PlayoffsTeamRecord] keyed by team
+    """
     records_by_team: dict[str, PlayoffsTeamRecord] = {}
 
     default_round = {"wins": 0, "losses": 0, "remaining": 0}
