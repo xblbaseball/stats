@@ -303,9 +303,18 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         # build season_stats.season_team_stats
         #
 
+        # remove DCs and games with missing data first. we don't want to include games with missing stats when we collect computed stats
+        # we know either 'week' or 'round' will be na, so ignore those columns when determining which games are DCs
+        all_columns_but_week_or_round = [
+            col for col in normalized_df.columns if col not in ["week", "round"]
+        ]
+        normalized_games_no_dcs_df = normalized_df.dropna(
+            subset=all_columns_but_week_or_round
+        )
+
         # a query that sums raw numbers for each team for the season
         # TODO do we need to include season here?
-        team_stats_df: pd.DataFrame = normalized_df.groupby("team").agg(
+        team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
             team=("team", "first"),
             player=("player", "first"),
             **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
@@ -366,9 +375,18 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         # build season_stats.playoffs_team_stats
         #
 
+        # remove DCs and games with missing data first. we don't want to include games with missing stats when we collect computed stats
+        # we know either 'week' or 'round' will be na, so ignore those columns when determining which games are DCs
+        all_columns_but_week_or_round = [
+            col for col in normalized_df.columns if col not in ["week", "round"]
+        ]
+        normalized_games_no_dcs_df = normalized_df.dropna(
+            subset=all_columns_but_week_or_round
+        )
+
         # a query that sums raw numbers for each team for the season
         # TODO do we need to include season here?
-        team_stats_df: pd.DataFrame = normalized_df.groupby("team").agg(
+        team_stats_df: pd.DataFrame = normalized_games_no_dcs_df.groupby("team").agg(
             team=("team", "first"),
             player=("player", "first"),
             **AGG_NORMALIZED_STATS_KWARGS,  # type: ignore
@@ -391,7 +409,7 @@ def main(args: type[StatsAggNamespace]) -> str | None:
         #
 
         season_stats_to_write["playoffs_team_records"] = collect_playoffs_team_records(
-            annotated_df
+            normalized_df
         )
 
     with open("deleteme.json", "w") as f:
