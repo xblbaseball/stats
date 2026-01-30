@@ -43,6 +43,11 @@ ALL_TIME_STATS = {
     "PLAYOFF_STATS": "1HWs44qhq9Buit3FIMfyh9j9G26hpnD7Eptv80FOntzg",
 }
 
+custom_headers = {
+    "Origin": os.getenv("G_SHEETS_ORIGIN", ""),
+    "Referer": os.getenv("G_SHEETS_REFERER", ""),
+}
+
 
 def collect_league_stats(json_dir: Path, g_sheets_api_key: str):
     tabs = ["Standings", "Hitting", "Pitching", "Playoffs", "Box%20Scores"]
@@ -52,10 +57,12 @@ def collect_league_stats(json_dir: Path, g_sheets_api_key: str):
             print(f"requesting {league} {tab}...", end="")
             url = f"https://sheets.googleapis.com/v4/spreadsheets/{LEAGUES[league]}/values/{tab}?key={g_sheets_api_key}"
 
-            with urllib.request.urlopen(url) as req, open(
+            req = urllib.request.Request(url, headers=custom_headers)
+
+            with urllib.request.urlopen(req) as res, open(
                 json_dir.joinpath(f"{league}__{tab}.json"), "wb"
             ) as f:
-                f.write(req.read())
+                f.write(res.read())
 
             print(f" saved {league} {tab}")
 
@@ -82,16 +89,18 @@ def collect_all_time_stats(json_dir: Path, g_sheets_api_key: str):
 
             url = f"https://sheets.googleapis.com/v4/spreadsheets/{ALL_TIME_STATS[sheet]}/values/{tab}?key={g_sheets_api_key}"
 
+            req = urllib.request.Request(url, headers=custom_headers)
+
             data = {}
-            with urllib.request.urlopen(url) as req, open(
+            with urllib.request.urlopen(req) as res, open(
                 json_dir.joinpath(f"{sheet}__{tab}.json"), "wb"
             ) as f:
-                f.write(req.read())
+                f.write(res.read())
 
             print(f" saved {sheet} {tab}")
 
 
-def main(args: SheetsNamespace):
+def main(args: type[SheetsNamespace]):
     if args.g_sheets_api_key is None or args.g_sheets_api_key == "":
         raise Exception("Missing Google Drive API key")
 
@@ -104,5 +113,5 @@ def main(args: SheetsNamespace):
 
 if __name__ == "__main__":
     parser = arg_parser()
-    args: SheetsNamespace = parser.parse_args()
+    args: type[SheetsNamespace] = parser.parse_args(namespace=SheetsNamespace)
     main(args)

@@ -29,6 +29,8 @@ Stats from the current season by league.
 1. (Recommended) create a `.env` file at the root of the repo with the following contents:
 ```
 G_SHEETS_API_KEY=
+G_SHEETS_ORIGIN=
+G_SHEETS_REFERER=
 ```
 2. (Suggested) create a virtual environment with [`venv`](https://docs.python.org/3/library/venv.html) first. Alternatively, `conda` would be fine.
 3. Install dependencies:
