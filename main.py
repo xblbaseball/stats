@@ -598,7 +598,7 @@ def collect_players(
             {
                 "player": player,
                 "team_name": team_name,
-                "team_abbrev": team_abbrev,
+                "team_abbrev": team_abbrev.upper(),
                 "league": "AAA",
                 "season": season,
             }
@@ -617,7 +617,7 @@ def collect_players(
             {
                 "player": player,
                 "team_name": team_name,
-                "team_abbrev": team_abbrev,
+                "team_abbrev": team_abbrev.upper(),
                 "league": "AA",
                 "season": season,
             }
