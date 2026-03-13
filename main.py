@@ -579,7 +579,7 @@ def collect_players(
             {
                 "player": player,
                 "team_name": team_name,
-                "team_abbrev": team_abbrev,
+                "team_abbrev": team_abbrev.upper(),
                 "league": "XBL",
                 "season": season,
             }
