@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 import pydantic
@@ -254,6 +255,7 @@ class CareerStats(TypedDict):
     regular_season_head_to_head: dict[str, dict[str, HeadToHead]]
     playoffs: dict[str, CareerPlayoffsPerformance]
     playoffs_head_to_head: List[HeadToHead]
+    last_updated_at: str
 
 
 class ModelArgs(argparse.Namespace):

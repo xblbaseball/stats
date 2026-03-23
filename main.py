@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 from collections import defaultdict
+from datetime import datetime
 import copy
 import json
 import logging
@@ -17,6 +18,7 @@ from pathlib import Path
 import shutil
 import traceback
 from typing import List
+from zoneinfo import ZoneInfo
 
 from models import *
 from utils import *
@@ -1198,6 +1200,9 @@ def build_career_stats(g_sheets_dir: Path, season: int):
         "regular_season_head_to_head": [],
         "playoffs": {},
         "playoffs_head_to_head": [],
+        "last_updated_at": datetime.strftime(
+            datetime.now(ZoneInfo("America/New_York")), "%Y-%m-%d %H:%M:%S"
+        ),
     }
 
     xbl_abbrev_data = None
