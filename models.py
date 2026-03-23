@@ -254,6 +254,8 @@ class CareerStats(TypedDict):
     regular_season_head_to_head: dict[str, dict[str, HeadToHead]]
     playoffs: dict[str, CareerPlayoffsPerformance]
     playoffs_head_to_head: List[HeadToHead]
+    """the last time we collected stats. in eastern time"""
+    last_updated_at: str
 
 
 class ModelArgs(argparse.Namespace):
