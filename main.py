@@ -125,8 +125,8 @@ def collect_team_records(
     """cleaned up team wins and losses for the regular season"""
     team_records: dict[str, SeasonTeamRecord] = {}
 
-    # return a different row for AA
-    get_row: int = lambda r: r + 2 if league == "AA" else r
+    # return a different col for AA
+    get_col: int = lambda c: c + 2 if league == "AA" else c
 
     for row in standings_data[1:]:
         team = row[1]
@@ -135,16 +135,18 @@ def collect_team_records(
             "rank": int(row[0]),
             "ego_starting": int(row[2]) if league == "AA" else None,
             "ego_current": int(row[3]) if league == "AA" else None,
-            "wins": int(row[get_row(2)]),
-            "losses": int(row[get_row(3)]),
-            "gb": 0.0 if row[get_row(4)] == "-" else float(row[get_row(4)]),
-            "win_pct": float(row[get_row(5)]),
-            "win_pct_vs_500": 0.0 if row[get_row(6)] == "-" else float(row[get_row(6)]),
-            "sweeps_w": int(row[get_row(7)]),
-            "splits": int(row[get_row(8)]),
-            "sweeps_l": int(row[get_row(9)]),
-            "sos": int(row[get_row(10)]),
-            "elo": int(row[get_row(19)].replace(",", "")),
+            "wins": int(row[get_col(2)]),
+            "losses": int(row[get_col(3)]),
+            "gb": 0.0 if row[get_col(4)] in ["-", ""] else float(row[get_col(4)]),
+            "win_pct": float(row[get_col(5)]),
+            "win_pct_vs_500": (
+                0.0 if row[get_col(6)] in ["-", ""] else float(row[get_col(6)])
+            ),
+            "sweeps_w": int(row[get_col(7)]),
+            "splits": int(row[get_col(8)]),
+            "sweeps_l": int(row[get_col(9)]),
+            "sos": int(row[get_col(10)]),
+            "elo": int(row[get_col(19)].replace(",", "")),
         }
 
     team_count = len(team_records)
@@ -871,7 +873,7 @@ def collect_career_performances_and_head_to_head(
 
         # alphabetical tuple of player names
         h2h_key = tuple(sorted((home_player, away_player)))
-        (player_a, player_z) = h2h_key
+        player_a, player_z = h2h_key
 
         # use this to figure out how players in raw_stats and h2h_stats translate
         player_a_is_away = player_a == away_player
