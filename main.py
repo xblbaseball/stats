@@ -137,9 +137,11 @@ def collect_team_records(
             "ego_current": int(row[3]) if league == "AA" else None,
             "wins": int(row[get_col(2)]),
             "losses": int(row[get_col(3)]),
-            "gb": 0.0 if row[get_col(4)] == "-" else float(row[get_col(4)]),
+            "gb": 0.0 if row[get_col(4)] in ["-", ""] else float(row[get_col(4)]),
             "win_pct": float(row[get_col(5)]),
-            "win_pct_vs_500": 0.0 if row[get_col(6)] == "-" else float(row[get_col(6)]),
+            "win_pct_vs_500": (
+                0.0 if row[get_col(6)] in ["-", ""] else float(row[get_col(6)])
+            ),
             "sweeps_w": int(row[get_col(7)]),
             "splits": int(row[get_col(8)]),
             "sweeps_l": int(row[get_col(9)]),
