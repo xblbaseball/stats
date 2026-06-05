@@ -272,7 +272,10 @@ def calc_stats_from_all_games(
         "obp": three_digits(
             (raw_stats["h"] + raw_stats["bb"]) / (raw_stats["ab"] + raw_stats["bb"])
         ),
-        "rc": (three_digits(raw_stats["h"] / raw_stats["r"])),
+        "rc": (three_digits(
+            (raw_stats["r"] - raw_stats["hr"])
+            / (raw_stats["h"] + raw_stats["bb"] - raw_stats["hr"])
+        ),
         "babip": three_digits(
             (raw_stats["h"] - raw_stats["hr"])
             / (raw_stats["ab"] - raw_stats["so"] - raw_stats["hr"])
