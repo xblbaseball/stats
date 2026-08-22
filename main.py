@@ -31,6 +31,7 @@ LEAGUES = ["XBL", "AAA", "AA"]
 logger = logging.getLogger("stats/main")
 logging.basicConfig(filename="main.log", level=logging.INFO)
 
+PENALTY_LOSS_TEAM = "__PENALTY_LOSS__"
 
 class StatsAggNamespace(argparse.Namespace):
     season: int
@@ -175,13 +176,23 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league
 
     for game in box_score_data[1:]:
         try:
+            if len(game) < 5:
+                raise Exception("At minimum, a game needs [the week/round, away team, away score, home score, home team, the number of innings] to be recorded")
+
             away_team = game[1]
             home_team = game[4]
+            away_score_raw = game[2]
+            home_score_raw = game[3]
+
+            # very specific box scores for penalty losses:
+            #   away team is missing, away score is 1, home score is missing, home team is the team being penalized
+            penalty_loss = away_team == "" and away_score_raw == "1" and home_score_raw == "" and home_team != ""
+
             away_score = int(game[2])
-            home_score = int(game[3])
-            innings = float(game[get_col(5)])
+            home_score = int(game[3]) if not penalty_loss else 0
+            innings = float(game[get_col(5)]) if not penalty_loss else 0.
             results = {
-                "away_team": away_team,
+                "away_team": away_team if not penalty_loss else PENALTY_LOSS_TEAM,
                 "home_team": home_team,
                 "away_score": away_score,
                 "home_score": home_score,
@@ -189,6 +200,7 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league
                 "winner": away_team if away_score > home_score else home_team,
                 "run_rule": innings <= 8.0,
                 "league": league,
+                "penalty_loss": penalty_loss
             }
             if playoffs:
                 results["round"] = game[0]
@@ -197,34 +209,36 @@ def collect_game_results(playoffs: bool, box_score_data: List[List[str]], league
         except ValueError as e:
             print("Something is horribly wrong with this game:")
             print(game)
+            print(e)
             continue
 
-        try:
-            extra_stats = {
-                "away_e": None if playoffs else int(game[5]),
-                "home_e": None if playoffs else int(game[6]),
-                # not all of these are always recorded. missing records are probably from disconnects
-                "away_ab": maybe(game, get_col(6), int),
-                "away_r": maybe(game, get_col(7), int),
-                "away_hits": maybe(game, get_col(8), int),
-                "away_hr": maybe(game, get_col(9), int),
-                "away_rbi": maybe(game, get_col(10), int),
-                "away_bb": maybe(game, get_col(11), int),
-                "away_so": maybe(game, get_col(12), int),
-                "home_ab": maybe(game, get_col(13), int),
-                "home_r": maybe(game, get_col(14), int),
-                "home_hits": maybe(game, get_col(15), int),
-                "home_hr": maybe(game, get_col(16), int),
-                "home_rbi": maybe(game, get_col(17), int),
-                "home_bb": maybe(game, get_col(18), int),
-                "home_so": maybe(game, get_col(19), int),
-            }
+        if not penalty_loss:
+            try:
+                extra_stats = {
+                    "away_e": None if playoffs else int(game[5]),
+                    "home_e": None if playoffs else int(game[6]),
+                    # not all of these are always recorded. missing records are probably from disconnects
+                    "away_ab": maybe(game, get_col(6), int),
+                    "away_r": maybe(game, get_col(7), int),
+                    "away_hits": maybe(game, get_col(8), int),
+                    "away_hr": maybe(game, get_col(9), int),
+                    "away_rbi": maybe(game, get_col(10), int),
+                    "away_bb": maybe(game, get_col(11), int),
+                    "away_so": maybe(game, get_col(12), int),
+                    "home_ab": maybe(game, get_col(13), int),
+                    "home_r": maybe(game, get_col(14), int),
+                    "home_hits": maybe(game, get_col(15), int),
+                    "home_hr": maybe(game, get_col(16), int),
+                    "home_rbi": maybe(game, get_col(17), int),
+                    "home_bb": maybe(game, get_col(18), int),
+                    "home_so": maybe(game, get_col(19), int),
+                }
 
-            results |= extra_stats
+                results |= extra_stats
 
-        except ValueError as e:
-            # some column is wrong in the extra stats. don't collect them
-            pass
+            except ValueError as e:
+                # some column is wrong in the extra stats. don't collect them
+                pass
 
         game_results.append(results)
 
@@ -328,6 +342,7 @@ def calc_stats_from_all_games(
         "losses": raw_stats["losses"],
         "wins_by_run_rule": raw_stats["wins_by_run_rule"],
         "losses_by_run_rule": raw_stats["losses_by_run_rule"],
+        "penalty_losses": raw_stats["penalty_losses"]
     }
 
     if "seasons" in raw_stats:
@@ -346,6 +361,7 @@ def calc_team_stats(game_results: List[GameResults]):
         "innings_hitting": 0,
         "wins": 0,
         "losses": 0,
+        "penalty_losses": 0,
         "wins_by_run_rule": 0,
         "losses_by_run_rule": 0,
         "ab": 0,
@@ -374,10 +390,16 @@ def calc_team_stats(game_results: List[GameResults]):
     for game in game_results:
         away = game["away_team"]
         home = game["home_team"]
-        if away not in raw_stats_by_team:
+
+        if away not in raw_stats_by_team and away != PENALTY_LOSS_TEAM:
             raw_stats_by_team[away] = copy.deepcopy(blank_team_stats_by_game)
         if home not in raw_stats_by_team:
             raw_stats_by_team[home] = copy.deepcopy(blank_team_stats_by_game)
+
+        if game["penalty_loss"] and away == PENALTY_LOSS_TEAM:
+            raw_stats_by_team[home]["penalty_losses"] += 1
+            raw_stats_by_team[home]["losses"] += 1
+            continue
 
         if game["winner"] == away:
             raw_stats_by_team[away]["wins"] += 1
@@ -754,6 +776,8 @@ def collect_career_performances_and_head_to_head(
         "losses": 0,
         "wins_by_run_rule": 0,
         "losses_by_run_rule": 0,
+        # FYI never actually recorded in historical head2head or career data
+        "penalty_losses": 0,
         "ab": 0,
         "r": 0,
         "h": 0,
