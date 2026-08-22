@@ -14,6 +14,7 @@ class TeamRecord(TypedDict):
     team: str
     wins: int
     losses: int
+    penalty_losses: int
     remaining: int
 
 
@@ -98,6 +99,7 @@ class TeamStats(TypedDict):
     innings_game: float
     wins: int
     losses: int
+    penalty_losses: int
     wins_by_run_rule: int
     losses_by_run_rule: int
     seasons: List[int]
@@ -117,6 +119,7 @@ class GameResults(TypedDict):
     run_rule: bool
     winner: str
     innings: int
+    penalty_loss: bool
     away_ab: int
     away_r: int
     away_hits: int
@@ -154,6 +157,7 @@ class RawStats(TypedDict):
     innings_hitting: int
     wins_by_run_rule: int
     losses_by_run_rule: int
+    penalty_losses: int
     ab: int
     r: int
     h: int
